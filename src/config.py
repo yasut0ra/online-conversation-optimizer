@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
 
 
 def _ensure_env_loaded() -> None:
@@ -22,7 +21,7 @@ def _ensure_env_loaded() -> None:
         os.environ.setdefault(key, value)
 
 
-def _split_list(value: Optional[str]) -> Optional[List[str]]:
+def _split_list(value: str | None) -> list[str] | None:
     if value is None or value.strip() == "":
         return None
     items = [item.strip() for item in value.split(",") if item.strip()]
@@ -33,9 +32,9 @@ def _split_list(value: Optional[str]) -> Optional[List[str]]:
 class AppConfig:
     """Runtime configuration sourced from environment variables."""
 
-    openai_api_key: Optional[str]
+    openai_api_key: str | None
     candidate_count: int
-    styles_whitelist: Optional[List[str]]
+    styles_whitelist: list[str] | None
     log_path: Path = field(default_factory=lambda: Path("logs/interactions.jsonl"))
     bandit_algo: str = "linucb"
 
