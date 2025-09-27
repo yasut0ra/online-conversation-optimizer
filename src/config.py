@@ -13,12 +13,10 @@ class AppConfig:
 
     candidate_count: int = int(os.getenv("CANDIDATE_COUNT", "3"))
     log_path: Path = Path(os.getenv("LOG_PATH", "logs/interactions.jsonl"))
-    bandit_state_path: Path = Path(os.getenv("BANDIT_STATE_PATH", "state/linucb.json"))
-    bandit_policy: str = os.getenv("BANDIT_POLICY", "linucb")
+    bandit_algo: str = os.getenv("BANDIT_ALGO", os.getenv("BANDIT_POLICY", "linucb"))
 
 
 def load_config() -> AppConfig:
     """Return the active application configuration."""
 
     return AppConfig()
-
