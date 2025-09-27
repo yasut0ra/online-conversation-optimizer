@@ -21,7 +21,7 @@ Run the API:
 
 ```bash
 export OPENAI_API_KEY=your_key_here  # optional
-pip install fastapi uvicorn numpy httpx pytest ruff jinja2
+pip install fastapi uvicorn numpy httpx pytest ruff jinja2 python-multipart
 uvicorn src.app:app --reload
 ```
 
