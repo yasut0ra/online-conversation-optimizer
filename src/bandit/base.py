@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 import numpy as np
 
@@ -13,10 +12,10 @@ from .utils import ensure_1d, ensure_2d, get_env_float, softmax
 class Bandit(ABC):
     """Minimal bandit interface shared across algorithms."""
 
-    def __init__(self, beta: Optional[float] = None) -> None:
+    def __init__(self, beta: float | None = None) -> None:
         self._beta = beta if beta is not None else get_env_float("SOFTMAX_BETA", 1.0)
-        self._last_scores: Optional[np.ndarray] = None
-        self._last_idx: Optional[int] = None
+        self._last_scores: np.ndarray | None = None
+        self._last_idx: int | None = None
 
     def select(self, scores: np.ndarray, phi: np.ndarray) -> int:
         """Pick an action index given prior scores and feature matrix."""
@@ -41,7 +40,7 @@ class Bandit(ABC):
     def update(self, phi: np.ndarray, reward: float, chosen_idx: int) -> None:
         """Update model parameters using full feature matrix and observed reward."""
 
-    def propensity(self, scores: Optional[np.ndarray] = None) -> float:
+    def propensity(self, scores: np.ndarray | None = None) -> float:
         """Return the softmax probability of the last chosen action."""
 
         if scores is None:
