@@ -5,14 +5,14 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence
 
 from ..prompt_loader import PromptLoader
 from ..types import Candidate, GenerationContext, Message
 
 DEFAULT_MODEL_NAME = "gpt-4o-mini"
-PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
+PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 PROMPT_ORDER = ["00_system_core", "10_generator", "11_styles_catalog"]
 
 
@@ -26,7 +26,7 @@ def _load_styles_catalog(loader: PromptLoader) -> dict:
 
 
 def _compose_system_prompt(loader: PromptLoader) -> str:
-    parts: List[str] = []
+    parts: list[str] = []
     for prompt_id in PROMPT_ORDER:
         try:
             parts.append(loader.load(prompt_id))
@@ -61,7 +61,7 @@ class CandidateGenerator:
 
     def __init__(
         self,
-        prompt_loader: Optional[PromptLoader] = None,
+        prompt_loader: PromptLoader | None = None,
         model: str = DEFAULT_MODEL_NAME,
         temperature: float = 0.8,
         max_output_tokens: int = 600,
@@ -77,7 +77,7 @@ class CandidateGenerator:
     def styles_catalog(self) -> dict:
         return self._styles_catalog
 
-    def generate(self, context: GenerationContext) -> List[Candidate]:
+    def generate(self, context: GenerationContext) -> list[Candidate]:
         api_key = os.getenv("OPENAI_API_KEY")
         if api_key:
             try:
@@ -88,7 +88,7 @@ class CandidateGenerator:
 
     def _generate_via_openai(
         self, context: GenerationContext, api_key: str
-    ) -> List[Candidate]:
+    ) -> list[Candidate]:
         try:
             from openai import OpenAI
         except ImportError as exc:
@@ -116,7 +116,7 @@ class CandidateGenerator:
             ],
         )
 
-        text_fragments: List[str] = []
+        text_fragments: list[str] = []
         for output in response.output:
             if output.type != "message":
                 continue
@@ -131,7 +131,7 @@ class CandidateGenerator:
             raise RuntimeError("LLM response was not valid JSON") from exc
         if not isinstance(parsed, list):
             raise RuntimeError("LLM response did not return a list of candidates")
-        candidates: List[Candidate] = []
+        candidates: list[Candidate] = []
         language = self._infer_language(context.messages)
         for item in parsed:
             style = item.get("style", "unknown")
@@ -148,13 +148,13 @@ class CandidateGenerator:
             return self._generate_fallback(context)
         return candidates[: context.candidate_count]
 
-    def _generate_fallback(self, context: GenerationContext) -> List[Candidate]:
+    def _generate_fallback(self, context: GenerationContext) -> list[Candidate]:
         styles = context.styles_allowed or list(self._styles_catalog.keys())
         if not styles:
             styles = ["empathetic", "logical", "coach"]
         language = self._infer_language(context.messages)
         last_user = self._last_user_message(context.messages)
-        results: List[Candidate] = []
+        results: list[Candidate] = []
         for style in styles[: context.candidate_count]:
             text = self._fallback_text(style, last_user, language)
             style_meta = self._styles_catalog.get(style, {})
@@ -222,8 +222,8 @@ class CandidateGenerator:
 _GLOBAL_GENERATOR = CandidateGenerator()
 
 
-def _normalise_messages(history: Optional[Sequence]) -> List[Message]:
-    messages: List[Message] = []
+def _normalise_messages(history: Sequence | None) -> list[Message]:
+    messages: list[Message] = []
     if not history:
         return messages
     for item in history:
@@ -239,11 +239,11 @@ def _normalise_messages(history: Optional[Sequence]) -> List[Message]:
 
 
 def generate_candidates(
-    history: Optional[Sequence],
+    history: Sequence | None,
     user_utterance: str,
     candidate_count: int,
-    styles_whitelist: Optional[Sequence[str]] = None,
-) -> List[Candidate]:
+    styles_whitelist: Sequence[str] | None = None,
+) -> list[Candidate]:
     """Generate candidates given history and current user utterance."""
 
     messages = _normalise_messages(history)
