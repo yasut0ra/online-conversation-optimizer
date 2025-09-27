@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import os
-from typing import Optional
-
 import numpy as np
 
 from .base import Bandit
@@ -16,9 +13,9 @@ class LinUCB(Bandit):
 
     def __init__(
         self,
-        alpha: Optional[float] = None,
-        lam: Optional[float] = None,
-        beta: Optional[float] = None,
+        alpha: float | None = None,
+        lam: float | None = None,
+        beta: float | None = None,
     ) -> None:
         super().__init__(beta=beta)
         self._alpha = (
@@ -29,8 +26,8 @@ class LinUCB(Bandit):
         self._lambda = (
             lam if lam is not None else get_env_float("BANDIT_LAMBDA", 1.0)
         )
-        self._A: Optional[np.ndarray] = None
-        self._b: Optional[np.ndarray] = None
+        self._A: np.ndarray | None = None
+        self._b: np.ndarray | None = None
 
     def _select_impl(
         self, prior_scores: np.ndarray, features: np.ndarray
