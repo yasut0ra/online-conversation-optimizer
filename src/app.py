@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, validator
@@ -19,15 +18,14 @@ from .orchestrator import ConversationOrchestrator
 from .prompt_loader import PromptLoader
 from .types import GenerationContext, Message
 
-
 CONFIG: AppConfig = load_config()
 
 
 class TurnRequest(BaseModel):
-    history: List[str] = Field(default_factory=list, description="これまでの会話履歴")
+    history: list[str] = Field(default_factory=list, description="これまでの会話履歴")
     user_utterance: str = Field(..., description="現在のユーザ発話")
-    N: Optional[int] = Field(None, description="生成する候補数")
-    session_id: Optional[str] = Field(None, description="セッションID（任意）")
+    N: int | None = Field(None, description="生成する候補数")
+    session_id: str | None = Field(None, description="セッションID（任意）")
 
     @validator("user_utterance")
     def _validate_utterance(cls, value: str) -> str:
@@ -36,15 +34,15 @@ class TurnRequest(BaseModel):
         return value.strip()
 
     @validator("history")
-    def _validate_history(cls, value: List[str]) -> List[str]:
+    def _validate_history(cls, value: list[str]) -> list[str]:
         if len(value) > 50:
             raise ValueError("historyは50件までにしてください")
         return value
 
 
 class DebugInfo(BaseModel):
-    scores: List[float]
-    styles: List[str]
+    scores: list[float]
+    styles: list[str]
 
 
 class TurnResponse(BaseModel):
@@ -53,7 +51,7 @@ class TurnResponse(BaseModel):
     reply: str
     chosen_idx: int
     propensity: float
-    debug: Optional[DebugInfo] = None
+    debug: DebugInfo | None = None
 
 
 class FeedbackRequest(BaseModel):
@@ -94,8 +92,8 @@ _orchestrator = _build_orchestrator()
 _lock = asyncio.Lock()
 
 
-def _messages_from_history(history: List[str], user_utterance: str) -> List[Message]:
-    messages: List[Message] = []
+def _messages_from_history(history: list[str], user_utterance: str) -> list[Message]:
+    messages: list[Message] = []
     role = "user"
     for entry in history:
         messages.append(Message(role=role, content=entry))
@@ -142,7 +140,7 @@ async def turn(request: TurnRequest) -> TurnResponse:
 
 
 @app.post("/feedback")
-async def feedback(request: FeedbackRequest) -> Dict[str, str]:
+async def feedback(request: FeedbackRequest) -> dict[str, str]:
     if request.reward < -1.0 or request.reward > 1.0:
         raise HTTPException(status_code=400, detail="rewardは-1.0から1.0の範囲で指定してください")
 
