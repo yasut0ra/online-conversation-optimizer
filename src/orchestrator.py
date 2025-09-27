@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-import numpy as np
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 
 from .bandit import BanditManager, LinUCB
 from .features import FeatureExtractor
 from .generation import CandidateGenerator
 from .logging_utils import JsonlInteractionLogger, log_turn
-from .safety.guard import review_candidates
 from .prompt_loader import PromptLoader
+from .safety.guard import review_candidates
 from .types import BanditDecision, Candidate, GenerationContext, InteractionLogRecord
 
 
@@ -33,10 +33,10 @@ class TurnResult:
     context_hash: str
     session_id: str
     turn_id: str
-    candidates: List[Candidate]
+    candidates: list[Candidate]
     decision: BanditDecision
-    feature_vectors: List[List[float]]
-    feature_logs: List[Dict[str, float]]
+    feature_vectors: list[list[float]]
+    feature_logs: list[dict[str, float]]
 
     @property
     def chosen_candidate(self) -> Candidate:
@@ -48,11 +48,11 @@ class PendingInteraction:
     context_hash: str
     session_id: str
     turn_id: str
-    feature_vectors: List[List[float]]
-    feature_logs: List[Dict[str, float]]
+    feature_vectors: list[list[float]]
+    feature_logs: list[dict[str, float]]
     decision: BanditDecision
-    candidates: List[Candidate]
-    safety: Dict[str, object]
+    candidates: list[Candidate]
+    safety: dict[str, object]
 
 
 class ConversationOrchestrator:
@@ -61,10 +61,10 @@ class ConversationOrchestrator:
     def __init__(
         self,
         prompt_loader: PromptLoader,
-        generator: Optional[CandidateGenerator] = None,
-        bandit_manager: Optional[BanditManager] = None,
-        feature_extractor: Optional[FeatureExtractor] = None,
-        logger: Optional[JsonlInteractionLogger] = None,
+        generator: CandidateGenerator | None = None,
+        bandit_manager: BanditManager | None = None,
+        feature_extractor: FeatureExtractor | None = None,
+        logger: JsonlInteractionLogger | None = None,
         bandit_algo: str = "linucb",
     ) -> None:
         self._generator = generator or CandidateGenerator(prompt_loader)
@@ -74,13 +74,13 @@ class ConversationOrchestrator:
         self._bandit = bandit_manager or BanditManager(LinUCB())
         self._logger = logger
         self._bandit_algo = bandit_algo
-        self._pending: Dict[Tuple[str, str], PendingInteraction] = {}
+        self._pending: dict[tuple[str, str], PendingInteraction] = {}
 
     def run_turn(
         self,
         context: GenerationContext,
-        session_id: Optional[str] = None,
-        turn_id: Optional[str] = None,
+        session_id: str | None = None,
+        turn_id: str | None = None,
     ) -> TurnResult:
         candidates = self._generator.generate(context)
         candidates, safety_meta = self._apply_safety(context, candidates)
@@ -206,18 +206,18 @@ class ConversationOrchestrator:
         )
 
     def _apply_safety(
-        self, context: GenerationContext, candidates: List[Candidate]
-    ) -> Tuple[List[Candidate], Dict[str, object]]:
+        self, context: GenerationContext, candidates: list[Candidate]
+    ) -> tuple[list[Candidate], dict[str, object]]:
         attempts = 0
-        last_scores: List[float] = []
-        last_rewrites: List[str] = []
+        last_scores: list[float] = []
+        last_rewrites: list[str] = []
         original_candidates = candidates
         while attempts < 2:
             approved, scores, rewrites = review_candidates(candidates)
             last_scores = scores
             last_rewrites = rewrites
             if approved:
-                filtered: List[Candidate] = []
+                filtered: list[Candidate] = []
                 for idx in approved:
                     cand = candidates[idx]
                     cand_features = dict(cand.features)
@@ -234,8 +234,8 @@ class ConversationOrchestrator:
             if attempts < 2:
                 candidates = self._generator.generate(context)
 
-        sanitized: List[Candidate] = []
-        sanitized_scores: List[float] = []
+        sanitized: list[Candidate] = []
+        sanitized_scores: list[float] = []
         source_candidates = candidates or original_candidates
         for idx, cand in enumerate(source_candidates):
             text = last_rewrites[idx] if idx < len(last_rewrites) and last_rewrites[idx] else cand.text
