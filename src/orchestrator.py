@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 from .bandit import BanditManager, LinUCB
-from .feature import FeatureExtractor
+from .features import FeatureExtractor
 from .generation import CandidateGenerator
 from .logging_utils import JsonlInteractionLogger
 from .prompt_loader import PromptLoader

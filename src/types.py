@@ -16,11 +16,11 @@ class Message:
 
 @dataclass
 class Candidate:
-    """A generated candidate reply with optional metadata."""
+    """A generated candidate reply with attached feature metadata."""
 
     text: str
     style: str
-    meta: Dict[str, Any] = field(default_factory=dict)
+    features: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -54,4 +54,3 @@ class InteractionLogRecord:
     propensity: float
     reward: Optional[float]
     features: Dict[str, Any]
-

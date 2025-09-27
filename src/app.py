@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from .bandit import BanditManager, LinTS, LinUCB
 from .config import AppConfig, load_config
-from .feature import FeatureExtractor
+from .features import FeatureExtractor
 from .generation import CandidateGenerator
 from .logging_utils import JsonlInteractionLogger
 from .orchestrator import ConversationOrchestrator
@@ -37,16 +37,19 @@ class TurnRequest(BaseModel):
         None, description="Override default number of candidates"
     )
 
-    def to_generation_context(self, default_count: int) -> GenerationContext:
+    def to_generation_context(
+        self, default_count: int, default_styles: Optional[List[str]]
+    ) -> GenerationContext:
         candidate_count = self.candidate_count or default_count
         if candidate_count <= 0:
             raise ValueError("candidate_count must be positive")
+        styles_allowed = self.styles_allowed or default_styles
         return GenerationContext(
             messages=[Message(role=m.role, content=m.content) for m in self.messages],
             user_profile=self.user_profile,
             goal=self.goal,
             constraints=self.constraints,
-            styles_allowed=self.styles_allowed,
+            styles_allowed=styles_allowed,
             candidate_count=candidate_count,
         )
 
@@ -54,7 +57,7 @@ class TurnRequest(BaseModel):
 class CandidateOut(BaseModel):
     text: str
     style: str
-    meta: Dict[str, Any]
+    features: Dict[str, Any]
 
 
 class TurnResponse(BaseModel):
@@ -105,7 +108,9 @@ _lock = asyncio.Lock()
 @app.post("/turn", response_model=TurnResponse)
 async def turn(request: TurnRequest) -> TurnResponse:
     try:
-        context = request.to_generation_context(CONFIG.candidate_count)
+        context = request.to_generation_context(
+            CONFIG.candidate_count, CONFIG.styles_whitelist
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
