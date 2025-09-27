@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import numpy as np
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from .bandit import BanditManager, LinUCBPolicy
+from .bandit import BanditManager, LinUCB
 from .feature import FeatureExtractor
 from .generation import CandidateGenerator
 from .logging_utils import JsonlInteractionLogger
@@ -63,7 +64,7 @@ class ConversationOrchestrator:
         if feature_extractor is None:
             feature_extractor = FeatureExtractor(self._generator.styles_catalog)
         self._feature_extractor = feature_extractor
-        self._bandit = bandit_manager or BanditManager(LinUCBPolicy())
+        self._bandit = bandit_manager or BanditManager(LinUCB())
         self._logger = logger
         self._pending: Dict[str, PendingInteraction] = {}
 
@@ -73,7 +74,9 @@ class ConversationOrchestrator:
             context, candidates
         )
 
-        decision = self._bandit.select(feature_vectors)
+        feature_matrix = np.asarray(feature_vectors, dtype=float)
+        prior_scores = np.zeros(feature_matrix.shape[0])
+        decision = self._bandit.select(prior_scores, feature_matrix)
         context_hash = _hash_context(context)
 
         propensity = decision.propensities[decision.chosen_index]
@@ -113,8 +116,8 @@ class ConversationOrchestrator:
         if not pending:
             raise KeyError(f"No pending interaction found for {context_hash}")
 
-        feature_vector = pending.feature_vectors[pending.decision.chosen_index]
-        self._bandit.update(pending.decision.chosen_index, reward, feature_vector)
+        feature_matrix = np.asarray(pending.feature_vectors, dtype=float)
+        self._bandit.update(feature_matrix, reward, pending.decision.chosen_index)
 
         if self._logger:
             propensity = pending.decision.propensities[pending.decision.chosen_index]
