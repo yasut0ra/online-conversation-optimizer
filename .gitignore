@@ -1,0 +1,80 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.dist-info/
+build/
+dist/
+pip-wheel-metadata/
+
+# venv / env
+.venv/
+venv/
+env/
+ENV/
+*.env
+*.env.*
+
+# tooling & caches
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+.ipynb_checkpoints/
+ruff_cache/
+.pyright/
+
+# logs, data, artifacts
+logs/
+*.log
+*.tmp
+tmp/
+temp/
+.cache/
+data/raw/
+data/tmp/
+checkpoints/
+outputs/
+runs/
+models/
+artifacts/
+
+# FastAPI/SQLite等（必要なら）
+*.db
+*.sqlite
+*.sqlite3
+
+# Node/Electron (将来GUIを想定)
+node_modules/
+npm-debug.log*
+yarn-error.log
+.pnpm-store/
+.eslintcache/
+.next/
+out/
+.svelte-kit/
+.vite/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+Icon?
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Project-specific
+# keep prompts tracked; ignore local notes
+notes/
