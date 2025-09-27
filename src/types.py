@@ -49,6 +49,8 @@ class InteractionLogRecord:
     """Structure recorded for every interaction step."""
 
     context_hash: str
+    session_id: str
+    turn_id: str
     candidates: List[Candidate]
     chosen_idx: int
     propensity: float

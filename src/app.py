@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from .bandit import BanditManager, LinTS, LinUCB
 from .config import AppConfig, load_config
@@ -22,56 +23,43 @@ from .types import GenerationContext, Message
 CONFIG: AppConfig = load_config()
 
 
-class MessageIn(BaseModel):
-    role: str = Field(..., description="speaker role, e.g. user/assistant")
-    content: str = Field(..., description="message text")
-
-
 class TurnRequest(BaseModel):
-    messages: List[MessageIn]
-    user_profile: Optional[Dict[str, Any]] = None
-    goal: Optional[str] = None
-    constraints: Optional[Dict[str, Any]] = None
-    styles_allowed: Optional[List[str]] = None
-    candidate_count: Optional[int] = Field(
-        None, description="Override default number of candidates"
-    )
+    history: List[str] = Field(default_factory=list, description="これまでの会話履歴")
+    user_utterance: str = Field(..., description="現在のユーザ発話")
+    N: Optional[int] = Field(None, description="生成する候補数")
+    session_id: Optional[str] = Field(None, description="セッションID（任意）")
 
-    def to_generation_context(
-        self, default_count: int, default_styles: Optional[List[str]]
-    ) -> GenerationContext:
-        candidate_count = self.candidate_count or default_count
-        if candidate_count <= 0:
-            raise ValueError("candidate_count must be positive")
-        styles_allowed = self.styles_allowed or default_styles
-        return GenerationContext(
-            messages=[Message(role=m.role, content=m.content) for m in self.messages],
-            user_profile=self.user_profile,
-            goal=self.goal,
-            constraints=self.constraints,
-            styles_allowed=styles_allowed,
-            candidate_count=candidate_count,
-        )
+    @validator("user_utterance")
+    def _validate_utterance(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("ユーザ発話が空です")
+        return value.strip()
+
+    @validator("history")
+    def _validate_history(cls, value: List[str]) -> List[str]:
+        if len(value) > 50:
+            raise ValueError("historyは50件までにしてください")
+        return value
 
 
-class CandidateOut(BaseModel):
-    text: str
-    style: str
-    features: Dict[str, Any]
+class DebugInfo(BaseModel):
+    scores: List[float]
+    styles: List[str]
 
 
 class TurnResponse(BaseModel):
-    context_hash: str
+    session_id: str
+    turn_id: str
+    reply: str
     chosen_idx: int
-    candidate: CandidateOut
-    candidates: List[CandidateOut]
-    propensities: List[float]
-    scores: List[float]
-    features: Dict[str, Any]
+    propensity: float
+    debug: Optional[DebugInfo] = None
 
 
 class FeedbackRequest(BaseModel):
-    context_hash: str
+    session_id: str
+    turn_id: str
+    chosen_idx: int
     reward: float
 
 
@@ -106,42 +94,70 @@ _orchestrator = _build_orchestrator()
 _lock = asyncio.Lock()
 
 
+def _messages_from_history(history: List[str], user_utterance: str) -> List[Message]:
+    messages: List[Message] = []
+    role = "user"
+    for entry in history:
+        messages.append(Message(role=role, content=entry))
+        role = "assistant" if role == "user" else "user"
+    messages.append(Message(role="user", content=user_utterance))
+    return messages
+
+
 @app.post("/turn", response_model=TurnResponse)
 async def turn(request: TurnRequest) -> TurnResponse:
-    try:
-        context = request.to_generation_context(
-            CONFIG.candidate_count, CONFIG.styles_whitelist
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    candidate_count = request.N or CONFIG.candidate_count
+    if candidate_count <= 0:
+        raise HTTPException(status_code=400, detail="Nは正の整数にしてください")
+
+    messages = _messages_from_history(request.history, request.user_utterance)
+    context = GenerationContext(
+        messages=messages,
+        candidate_count=candidate_count,
+        styles_allowed=CONFIG.styles_whitelist,
+    )
+    session_id = request.session_id.strip() if request.session_id else None
+    if session_id and len(session_id) > 128:
+        raise HTTPException(status_code=400, detail="session_idが長すぎます")
+    session = session_id or str(uuid.uuid4())
+    turn_id = str(uuid.uuid4())
 
     async with _lock:
-        result = _orchestrator.run_turn(context)
+        result = _orchestrator.run_turn(context, session_id=session, turn_id=turn_id)
 
     chosen = result.chosen_candidate
-    candidates = [CandidateOut(**c.__dict__) for c in result.candidates]
-    features = {
-        "vectors": result.feature_vectors,
-        "mappings": result.feature_logs,
-    }
-    return TurnResponse(
-        context_hash=result.context_hash,
-        chosen_idx=result.decision.chosen_index,
-        candidate=CandidateOut(**chosen.__dict__),
-        candidates=candidates,
-        propensities=result.decision.propensities,
+    debug = DebugInfo(
         scores=result.decision.scores,
-        features=features,
+        styles=[candidate.style for candidate in result.candidates],
+    )
+
+    return TurnResponse(
+        session_id=result.session_id,
+        turn_id=result.turn_id,
+        reply=chosen.text,
+        chosen_idx=result.decision.chosen_index,
+        propensity=result.decision.propensities[result.decision.chosen_index],
+        debug=debug,
     )
 
 
 @app.post("/feedback")
 async def feedback(request: FeedbackRequest) -> Dict[str, str]:
+    if request.reward < -1.0 or request.reward > 1.0:
+        raise HTTPException(status_code=400, detail="rewardは-1.0から1.0の範囲で指定してください")
+
     async with _lock:
         try:
-            _orchestrator.apply_feedback(request.context_hash, request.reward)
+            _orchestrator.apply_feedback(
+                request.session_id,
+                request.turn_id,
+                request.chosen_idx,
+                request.reward,
+            )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"status": "ok"}
 

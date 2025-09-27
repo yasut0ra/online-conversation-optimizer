@@ -31,6 +31,8 @@ def _hash_context(context: GenerationContext) -> str:
 @dataclass
 class TurnResult:
     context_hash: str
+    session_id: str
+    turn_id: str
     candidates: List[Candidate]
     decision: BanditDecision
     feature_vectors: List[List[float]]
@@ -44,6 +46,8 @@ class TurnResult:
 @dataclass
 class PendingInteraction:
     context_hash: str
+    session_id: str
+    turn_id: str
     feature_vectors: List[List[float]]
     feature_logs: List[Dict[str, float]]
     decision: BanditDecision
@@ -70,9 +74,14 @@ class ConversationOrchestrator:
         self._bandit = bandit_manager or BanditManager(LinUCB())
         self._logger = logger
         self._bandit_algo = bandit_algo
-        self._pending: Dict[str, PendingInteraction] = {}
+        self._pending: Dict[Tuple[str, str], PendingInteraction] = {}
 
-    def run_turn(self, context: GenerationContext) -> TurnResult:
+    def run_turn(
+        self,
+        context: GenerationContext,
+        session_id: Optional[str] = None,
+        turn_id: Optional[str] = None,
+    ) -> TurnResult:
         candidates = self._generator.generate(context)
         candidates, safety_meta = self._apply_safety(context, candidates)
         feature_vectors, feature_logs = self._feature_extractor.build_features(
@@ -83,10 +92,14 @@ class ConversationOrchestrator:
         prior_scores = np.zeros(feature_matrix.shape[0])
         decision = self._bandit.select(prior_scores, feature_matrix)
         context_hash = _hash_context(context)
+        session = session_id or context_hash
+        turn = turn_id or context_hash
 
         propensity = decision.propensities[decision.chosen_index]
         log_record = InteractionLogRecord(
             context_hash=context_hash,
+            session_id=session,
+            turn_id=turn,
             candidates=candidates,
             chosen_idx=decision.chosen_index,
             propensity=propensity,
@@ -102,8 +115,8 @@ class ConversationOrchestrator:
             self._logger.log(log_record)
 
         log_turn(
-            session_id=context_hash,
-            turn_id=context_hash,
+            session_id=session,
+            turn_id=turn,
             payload={
                 "phase": "turn",
                 "context_hash": context_hash,
@@ -116,8 +129,11 @@ class ConversationOrchestrator:
             },
         )
 
-        self._pending[context_hash] = PendingInteraction(
+        key = (session, turn)
+        self._pending[key] = PendingInteraction(
             context_hash=context_hash,
+            session_id=session,
+            turn_id=turn,
             feature_vectors=feature_vectors,
             feature_logs=feature_logs,
             decision=decision,
@@ -127,16 +143,28 @@ class ConversationOrchestrator:
 
         return TurnResult(
             context_hash=context_hash,
+            session_id=session,
+            turn_id=turn,
             candidates=candidates,
             decision=decision,
             feature_vectors=feature_vectors,
             feature_logs=feature_logs,
         )
 
-    def apply_feedback(self, context_hash: str, reward: float) -> None:
-        pending = self._pending.pop(context_hash, None)
+    def apply_feedback(
+        self,
+        session_id: str,
+        turn_id: str,
+        chosen_idx: int,
+        reward: float,
+    ) -> None:
+        key = (session_id, turn_id)
+        pending = self._pending.pop(key, None)
         if not pending:
-            raise KeyError(f"No pending interaction found for {context_hash}")
+            raise KeyError("該当のターンが見つかりませんでした")
+
+        if chosen_idx != pending.decision.chosen_index:
+            raise ValueError("選択された候補が一致しません")
 
         feature_matrix = np.asarray(pending.feature_vectors, dtype=float)
         self._bandit.update(feature_matrix, reward, pending.decision.chosen_index)
@@ -151,7 +179,9 @@ class ConversationOrchestrator:
 
         if self._logger:
             record = InteractionLogRecord(
-                context_hash=context_hash,
+                context_hash=pending.context_hash,
+                session_id=session_id,
+                turn_id=turn_id,
                 candidates=pending.candidates,
                 chosen_idx=pending.decision.chosen_index,
                 propensity=propensity,
@@ -161,11 +191,11 @@ class ConversationOrchestrator:
             self._logger.log(record)
 
         log_turn(
-            session_id=context_hash,
-            turn_id=context_hash,
+            session_id=session_id,
+            turn_id=turn_id,
             payload={
                 "phase": "feedback",
-                "context_hash": context_hash,
+                "context_hash": pending.context_hash,
                 "candidates": pending.candidates,
                 "chosen_idx": pending.decision.chosen_index,
                 "propensity": propensity,
