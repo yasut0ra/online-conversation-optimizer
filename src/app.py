@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from .bandit import BanditManager, LinTSPolicy, LinUCBPolicy
+from .bandit import BanditManager, LinTS, LinUCB
 from .config import AppConfig, load_config
 from .feature import FeatureExtractor
 from .generation import CandidateGenerator
@@ -80,12 +80,12 @@ def _build_orchestrator() -> ConversationOrchestrator:
     generator = CandidateGenerator(prompt_loader)
     feature_extractor = FeatureExtractor(generator.styles_catalog)
 
-    if config.bandit_policy.lower() == "lints":
-        policy = LinTSPolicy()
+    if config.bandit_algo.lower() == "lints":
+        policy = LinTS()
     else:
-        policy = LinUCBPolicy()
+        policy = LinUCB()
 
-    bandit_manager = BanditManager(policy, config.bandit_state_path)
+    bandit_manager = BanditManager(policy)
     logger = JsonlInteractionLogger(config.log_path)
     orchestrator = ConversationOrchestrator(
         prompt_loader,

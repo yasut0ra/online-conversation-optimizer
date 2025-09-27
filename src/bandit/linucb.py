@@ -1,82 +1,67 @@
-"""LinUCB contextual bandit implementation."""
+"""LinUCB implementation with environment-configurable exploration."""
 
 from __future__ import annotations
 
-from typing import Sequence
+import os
+from typing import Optional
 
 import numpy as np
 
-from ..types import BanditDecision
-from .base import BanditPolicy, LinearBanditState
+from .base import Bandit
+from .utils import ensure_2d, get_env_float
 
 
-def _softmax(scores: np.ndarray, temperature: float = 1.0) -> np.ndarray:
-    scaled = scores / max(temperature, 1e-6)
-    scaled -= scaled.max()
-    e = np.exp(scaled)
-    total = e.sum()
-    if total <= 0.0:
-        return np.ones_like(scores) / len(scores)
-    return e / total
+class LinUCB(Bandit):
+    """Linear UCB with shared parameter vector."""
 
-
-class LinUCBPolicy(BanditPolicy):
-    """LinUCB with shared parameters across actions."""
-
-    def __init__(self, alpha: float = 0.6, regularization: float = 1.0) -> None:
-        self._alpha = alpha
-        self._lambda = regularization
-        self._state: LinearBanditState | None = None
-
-    def select_action(self, features: Sequence[Sequence[float]]) -> BanditDecision:
-        matrix = np.asarray(features, dtype=float)
-        if matrix.ndim != 2:
-            raise ValueError("Features must be 2D: actions x dimension")
-
-        self._ensure_state(matrix.shape[1])
-        assert self._state is not None
-        invA = np.linalg.inv(self._state.A)
-        theta = invA @ self._state.b
-
-        means = matrix @ theta
-        uncertainties = np.array(
-            [self._alpha * np.sqrt(vec @ invA @ vec.T) for vec in matrix]
-        )
-        scores = means + uncertainties
-        propensities = _softmax(scores)
-        chosen_index = int(np.argmax(scores))
-
-        return BanditDecision(
-            chosen_index=chosen_index,
-            propensities=propensities.tolist(),
-            scores=scores.tolist(),
-        )
-
-    def update(
-        self, chosen_index: int, reward: float, feature_vector: Sequence[float]
+    def __init__(
+        self,
+        alpha: Optional[float] = None,
+        lam: Optional[float] = None,
+        beta: Optional[float] = None,
     ) -> None:
-        vec = np.asarray(feature_vector, dtype=float)
-        self._ensure_state(vec.shape[0])
-        assert self._state is not None
-        self._state.A += np.outer(vec, vec)
-        self._state.b += reward * vec
+        super().__init__(beta=beta)
+        self._alpha = (
+            alpha
+            if alpha is not None
+            else get_env_float("LINUCB_ALPHA", 0.6)
+        )
+        self._lambda = (
+            lam if lam is not None else get_env_float("BANDIT_LAMBDA", 1.0)
+        )
+        self._A: Optional[np.ndarray] = None
+        self._b: Optional[np.ndarray] = None
 
-    def get_state(self) -> LinearBanditState:
-        if self._state is None:
-            raise RuntimeError("State not initialised")
-        return self._state
+    def _select_impl(
+        self, prior_scores: np.ndarray, features: np.ndarray
+    ) -> tuple[int, np.ndarray]:
+        features = ensure_2d(features)
+        dim = features.shape[1]
+        self._ensure_state(dim)
+        assert self._A is not None and self._b is not None
 
-    def load_state(self, state: LinearBanditState) -> None:
-        self._state = state
+        A_inv = np.linalg.inv(self._A)
+        theta = A_inv @ self._b
+        means = features @ theta
+        uncertainties = np.sqrt(np.sum(features @ A_inv * features, axis=1))
+        scores = prior_scores + means + self._alpha * uncertainties
+        chosen = int(np.argmax(scores))
+        return chosen, scores
+
+    def update(self, phi: np.ndarray, reward: float, chosen_idx: int) -> None:
+        features = ensure_2d(phi)
+        dim = features.shape[1]
+        self._ensure_state(dim)
+        assert self._A is not None and self._b is not None
+
+        x = features[chosen_idx]
+        self._A += np.outer(x, x)
+        self._b += reward * x
 
     def _ensure_state(self, dim: int) -> None:
-        if self._state is None:
-            self._state = LinearBanditState(
-                dim=dim,
-                A=self._lambda * np.eye(dim),
-                b=np.zeros(dim),
-            )
-        elif self._state.dim != dim:
-            raise ValueError(
-                f"Feature dimension {dim} mismatched with existing {self._state.dim}"
-            )
+        if self._A is None or self._b is None:
+            self._A = self._lambda * np.eye(dim)
+            self._b = np.zeros(dim)
+        elif self._A.shape[0] != dim:
+            raise ValueError("Feature dimension mismatch for LinUCB")
+
