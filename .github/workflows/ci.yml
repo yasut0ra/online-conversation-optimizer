@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install fastapi uvicorn numpy pytest httpx ruff
+          pip install fastapi uvicorn numpy pytest httpx ruff jinja2 python-multipart
       - name: Lint
         run: ruff check .
       - name: Test

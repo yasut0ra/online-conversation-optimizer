@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.logging_utils import log_turn
 from src.types import Candidate
@@ -29,7 +29,7 @@ def test_log_turn_creates_file(tmp_path, monkeypatch):
 
     log_turn(session_id, turn_id, payload)
 
-    date_str = datetime.utcnow().strftime("%Y%m%d")
+    date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
     log_path = tmp_path / "logs" / f"turns-{date_str}.jsonl"
     assert log_path.exists()
 

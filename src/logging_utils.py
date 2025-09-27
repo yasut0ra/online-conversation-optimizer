@@ -8,7 +8,7 @@ import platform
 import threading
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -69,7 +69,8 @@ ENV_VERSIONS = _build_env_versions()
 def log_turn(session_id: str, turn_id: str, payload: dict[str, Any]) -> None:
     """Append a single turn entry to a date-partitioned JSONL file."""
 
-    date_str = datetime.utcnow().strftime("%Y%m%d")
+    now = datetime.now(timezone.utc)
+    date_str = now.strftime("%Y%m%d")
     log_path = Path("logs") / f"turns-{date_str}.jsonl"
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -80,7 +81,7 @@ def log_turn(session_id: str, turn_id: str, payload: dict[str, Any]) -> None:
         candidates_preview = []
 
     entry = {
-        "timestamp": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+        "timestamp": now.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
         "session_id": session_id,
         "turn_id": turn_id,
         "context_hash": payload.get("context_hash"),
@@ -96,6 +97,9 @@ def log_turn(session_id: str, turn_id: str, payload: dict[str, Any]) -> None:
     }
     if "phase" in payload:
         entry["phase"] = payload["phase"]
+    for key in ("latency_ms", "continued"):
+        if key in payload:
+            entry[key] = payload[key]
 
     with _APPEND_LOCK:
         with log_path.open("a", encoding="utf-8") as handle:

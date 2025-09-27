@@ -163,13 +163,17 @@ class ConversationOrchestrator:
         if not pending:
             raise KeyError("該当のターンが見つかりませんでした")
 
-        if chosen_idx != pending.decision.chosen_index:
+        feature_matrix = np.asarray(pending.feature_vectors, dtype=float)
+        if chosen_idx < 0 or chosen_idx >= feature_matrix.shape[0]:
             raise ValueError("選択された候補が一致しません")
 
-        feature_matrix = np.asarray(pending.feature_vectors, dtype=float)
-        self._bandit.update(feature_matrix, reward, pending.decision.chosen_index)
+        self._bandit.update(feature_matrix, reward, chosen_idx)
 
-        propensity = pending.decision.propensities[pending.decision.chosen_index]
+        propensity = (
+            pending.decision.propensities[chosen_idx]
+            if 0 <= chosen_idx < len(pending.decision.propensities)
+            else None
+        )
         log_features = {
             "vectors": pending.feature_vectors,
             "mappings": pending.feature_logs,
@@ -183,7 +187,7 @@ class ConversationOrchestrator:
                 session_id=session_id,
                 turn_id=turn_id,
                 candidates=pending.candidates,
-                chosen_idx=pending.decision.chosen_index,
+                chosen_idx=chosen_idx,
                 propensity=propensity,
                 reward=reward,
                 features=log_features,
@@ -197,7 +201,7 @@ class ConversationOrchestrator:
                 "phase": "feedback",
                 "context_hash": pending.context_hash,
                 "candidates": pending.candidates,
-                "chosen_idx": pending.decision.chosen_index,
+                "chosen_idx": chosen_idx,
                 "propensity": propensity,
                 "reward": reward,
                 "features": log_features,

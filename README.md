@@ -21,6 +21,7 @@ Run the API:
 
 ```bash
 export OPENAI_API_KEY=your_key_here  # optional
+pip install fastapi uvicorn numpy httpx pytest ruff jinja2 python-multipart
 uvicorn src.app:app --reload
 ```
 
@@ -97,6 +98,13 @@ curl -X POST http://localhost:8000/feedback \
 Each turn appends to `logs/turns-YYYYMMDD.jsonl` with previews, features, bandit metadata and rewards.
 
 Run `python scripts/quick_report.py` to see aggregate reward, style win rates, exploration, and propensity stats.
+
+## Web UI
+
+- Start the API (`uvicorn src.app:app --reload`) and open <http://localhost:8000/ui>.
+- 入力フォームにメッセージを送ると候補カードが表示され、クリックでフィードバックが送信されます。
+- 右上の簡易メトリクスは `/metrics` を定期ポーリングして更新されます。
+- **Screenshot placeholder:** _Add UI screenshot here_
 
 ## How to extend
 
