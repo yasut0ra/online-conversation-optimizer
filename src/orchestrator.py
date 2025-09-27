@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 from .bandit import BanditManager, LinUCB
 from .features import FeatureExtractor
 from .generation import CandidateGenerator
-from .logging_utils import JsonlInteractionLogger
+from .logging_utils import JsonlInteractionLogger, log_turn
 from .prompt_loader import PromptLoader
 from .types import BanditDecision, Candidate, GenerationContext, InteractionLogRecord
 
@@ -59,6 +59,7 @@ class ConversationOrchestrator:
         bandit_manager: Optional[BanditManager] = None,
         feature_extractor: Optional[FeatureExtractor] = None,
         logger: Optional[JsonlInteractionLogger] = None,
+        bandit_algo: str = "linucb",
     ) -> None:
         self._generator = generator or CandidateGenerator(prompt_loader)
         if feature_extractor is None:
@@ -66,6 +67,7 @@ class ConversationOrchestrator:
         self._feature_extractor = feature_extractor
         self._bandit = bandit_manager or BanditManager(LinUCB())
         self._logger = logger
+        self._bandit_algo = bandit_algo
         self._pending: Dict[str, PendingInteraction] = {}
 
     def run_turn(self, context: GenerationContext) -> TurnResult:
@@ -95,6 +97,21 @@ class ConversationOrchestrator:
         if self._logger:
             self._logger.log(log_record)
 
+        log_turn(
+            session_id=context_hash,
+            turn_id=context_hash,
+            payload={
+                "phase": "turn",
+                "context_hash": context_hash,
+                "candidates": candidates,
+                "chosen_idx": decision.chosen_index,
+                "propensity": propensity,
+                "reward": None,
+                "features": log_record.features,
+                "bandit_algo": self._bandit_algo,
+            },
+        )
+
         self._pending[context_hash] = PendingInteraction(
             context_hash=context_hash,
             feature_vectors=feature_vectors,
@@ -119,8 +136,9 @@ class ConversationOrchestrator:
         feature_matrix = np.asarray(pending.feature_vectors, dtype=float)
         self._bandit.update(feature_matrix, reward, pending.decision.chosen_index)
 
+        propensity = pending.decision.propensities[pending.decision.chosen_index]
+
         if self._logger:
-            propensity = pending.decision.propensities[pending.decision.chosen_index]
             record = InteractionLogRecord(
                 context_hash=context_hash,
                 candidates=pending.candidates,
@@ -134,3 +152,22 @@ class ConversationOrchestrator:
                 },
             )
             self._logger.log(record)
+
+        log_turn(
+            session_id=context_hash,
+            turn_id=context_hash,
+            payload={
+                "phase": "feedback",
+                "context_hash": context_hash,
+                "candidates": pending.candidates,
+                "chosen_idx": pending.decision.chosen_index,
+                "propensity": propensity,
+                "reward": reward,
+                "features": {
+                    "vectors": pending.feature_vectors,
+                    "mappings": pending.feature_logs,
+                    "scores": pending.decision.scores,
+                },
+                "bandit_algo": self._bandit_algo,
+            },
+        )
