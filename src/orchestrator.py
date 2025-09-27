@@ -6,12 +6,13 @@ import hashlib
 import json
 import numpy as np
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .bandit import BanditManager, LinUCB
 from .features import FeatureExtractor
 from .generation import CandidateGenerator
 from .logging_utils import JsonlInteractionLogger, log_turn
+from .safety.guard import review_candidates
 from .prompt_loader import PromptLoader
 from .types import BanditDecision, Candidate, GenerationContext, InteractionLogRecord
 
@@ -47,6 +48,7 @@ class PendingInteraction:
     feature_logs: List[Dict[str, float]]
     decision: BanditDecision
     candidates: List[Candidate]
+    safety: Dict[str, object]
 
 
 class ConversationOrchestrator:
@@ -72,6 +74,7 @@ class ConversationOrchestrator:
 
     def run_turn(self, context: GenerationContext) -> TurnResult:
         candidates = self._generator.generate(context)
+        candidates, safety_meta = self._apply_safety(context, candidates)
         feature_vectors, feature_logs = self._feature_extractor.build_features(
             context, candidates
         )
@@ -92,6 +95,7 @@ class ConversationOrchestrator:
                 "vectors": feature_vectors,
                 "mappings": feature_logs,
                 "scores": decision.scores,
+                "safety": safety_meta,
             },
         )
         if self._logger:
@@ -118,6 +122,7 @@ class ConversationOrchestrator:
             feature_logs=feature_logs,
             decision=decision,
             candidates=candidates,
+            safety=safety_meta,
         )
 
         return TurnResult(
@@ -137,6 +142,12 @@ class ConversationOrchestrator:
         self._bandit.update(feature_matrix, reward, pending.decision.chosen_index)
 
         propensity = pending.decision.propensities[pending.decision.chosen_index]
+        log_features = {
+            "vectors": pending.feature_vectors,
+            "mappings": pending.feature_logs,
+            "scores": pending.decision.scores,
+            "safety": pending.safety,
+        }
 
         if self._logger:
             record = InteractionLogRecord(
@@ -145,11 +156,7 @@ class ConversationOrchestrator:
                 chosen_idx=pending.decision.chosen_index,
                 propensity=propensity,
                 reward=reward,
-                features={
-                    "vectors": pending.feature_vectors,
-                    "mappings": pending.feature_logs,
-                    "scores": pending.decision.scores,
-                },
+                features=log_features,
             )
             self._logger.log(record)
 
@@ -163,11 +170,59 @@ class ConversationOrchestrator:
                 "chosen_idx": pending.decision.chosen_index,
                 "propensity": propensity,
                 "reward": reward,
-                "features": {
-                    "vectors": pending.feature_vectors,
-                    "mappings": pending.feature_logs,
-                    "scores": pending.decision.scores,
-                },
+                "features": log_features,
                 "bandit_algo": self._bandit_algo,
             },
         )
+
+    def _apply_safety(
+        self, context: GenerationContext, candidates: List[Candidate]
+    ) -> Tuple[List[Candidate], Dict[str, object]]:
+        attempts = 0
+        last_scores: List[float] = []
+        last_rewrites: List[str] = []
+        original_candidates = candidates
+        while attempts < 2:
+            approved, scores, rewrites = review_candidates(candidates)
+            last_scores = scores
+            last_rewrites = rewrites
+            if approved:
+                filtered: List[Candidate] = []
+                for idx in approved:
+                    cand = candidates[idx]
+                    cand_features = dict(cand.features)
+                    cand_features["safety_score"] = scores[idx]
+                    filtered.append(Candidate(text=cand.text, style=cand.style, features=cand_features))
+                meta = {
+                    "approved_indices": approved,
+                    "scores": scores,
+                    "rewrites": rewrites,
+                    "attempts": attempts + 1,
+                }
+                return filtered, meta
+            attempts += 1
+            if attempts < 2:
+                candidates = self._generator.generate(context)
+
+        sanitized: List[Candidate] = []
+        sanitized_scores: List[float] = []
+        source_candidates = candidates or original_candidates
+        for idx, cand in enumerate(source_candidates):
+            text = last_rewrites[idx] if idx < len(last_rewrites) and last_rewrites[idx] else cand.text
+            cand_features = dict(cand.features)
+            score = last_scores[idx] if idx < len(last_scores) else 0.0
+            cand_features.update({
+                "safety_score": score,
+                "sanitized": True,
+            })
+            sanitized.append(Candidate(text=text, style=cand.style, features=cand_features))
+            sanitized_scores.append(score)
+
+        meta = {
+            "approved_indices": [],
+            "scores": sanitized_scores,
+            "rewrites": last_rewrites,
+            "attempts": attempts,
+            "sanitized": True,
+        }
+        return sanitized, meta
