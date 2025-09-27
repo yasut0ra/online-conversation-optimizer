@@ -1,77 +1,68 @@
-"""Linear Thompson Sampling (LinTS) contextual bandit."""
+"""Linear Thompson Sampling bandit."""
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Optional
 
 import numpy as np
 
-from ..types import BanditDecision
-from .base import BanditPolicy, LinearBanditState
-from .linucb import _softmax
+from .base import Bandit
+from .utils import ensure_2d, get_env_float
 
 
-class LinTSPolicy(BanditPolicy):
-    """Posterior sampling for linear bandits."""
+class LinTS(Bandit):
+    """Posterior sampling for linear contextual bandits."""
 
     def __init__(
         self,
-        exploration_variance: float = 0.5,
-        regularization: float = 1.0,
-        random_state: int | None = None,
+        sigma2: Optional[float] = None,
+        lam: Optional[float] = None,
+        beta: Optional[float] = None,
+        random_state: Optional[int] = None,
     ) -> None:
-        self._v = exploration_variance
-        self._lambda = regularization
-        self._rng = np.random.default_rng(random_state)
-        self._state: LinearBanditState | None = None
-
-    def select_action(self, features: Sequence[Sequence[float]]) -> BanditDecision:
-        matrix = np.asarray(features, dtype=float)
-        if matrix.ndim != 2:
-            raise ValueError("Features must be 2D: actions x dimension")
-
-        self._ensure_state(matrix.shape[1])
-        assert self._state is not None
-        invA = np.linalg.inv(self._state.A)
-        theta_bar = invA @ self._state.b
-        cov = (self._v ** 2) * invA
-        theta_sample = self._rng.multivariate_normal(theta_bar, cov)
-
-        scores = matrix @ theta_sample
-        propensities = _softmax(scores)
-        chosen_index = int(np.argmax(scores))
-        return BanditDecision(
-            chosen_index=chosen_index,
-            propensities=propensities.tolist(),
-            scores=scores.tolist(),
+        super().__init__(beta=beta)
+        self._sigma2 = (
+            sigma2
+            if sigma2 is not None
+            else get_env_float("LINTS_SIGMA2", 0.5)
         )
+        self._lambda = (
+            lam if lam is not None else get_env_float("BANDIT_LAMBDA", 1.0)
+        )
+        self._rng = np.random.default_rng(random_state)
+        self._A: Optional[np.ndarray] = None
+        self._b: Optional[np.ndarray] = None
 
-    def update(
-        self, chosen_index: int, reward: float, feature_vector: Sequence[float]
-    ) -> None:
-        vec = np.asarray(feature_vector, dtype=float)
-        self._ensure_state(vec.shape[0])
-        assert self._state is not None
-        self._state.A += np.outer(vec, vec)
-        self._state.b += reward * vec
+    def _select_impl(
+        self, prior_scores: np.ndarray, features: np.ndarray
+    ) -> tuple[int, np.ndarray]:
+        features = ensure_2d(features)
+        dim = features.shape[1]
+        self._ensure_state(dim)
+        assert self._A is not None and self._b is not None
 
-    def get_state(self) -> LinearBanditState:
-        if self._state is None:
-            raise RuntimeError("State not initialised")
-        return self._state
+        A_inv = np.linalg.inv(self._A)
+        theta_bar = A_inv @ self._b
+        cov = (self._sigma2) * A_inv
+        theta_sample = self._rng.multivariate_normal(theta_bar, cov)
+        scores = prior_scores + features @ theta_sample
+        chosen = int(np.argmax(scores))
+        return chosen, scores
 
-    def load_state(self, state: LinearBanditState) -> None:
-        self._state = state
+    def update(self, phi: np.ndarray, reward: float, chosen_idx: int) -> None:
+        features = ensure_2d(phi)
+        dim = features.shape[1]
+        self._ensure_state(dim)
+        assert self._A is not None and self._b is not None
+
+        x = features[chosen_idx]
+        self._A += np.outer(x, x)
+        self._b += reward * x
 
     def _ensure_state(self, dim: int) -> None:
-        if self._state is None:
-            self._state = LinearBanditState(
-                dim=dim,
-                A=self._lambda * np.eye(dim),
-                b=np.zeros(dim),
-            )
-        elif self._state.dim != dim:
-            raise ValueError(
-                f"Feature dimension {dim} mismatched with existing {self._state.dim}"
-            )
+        if self._A is None or self._b is None:
+            self._A = self._lambda * np.eye(dim)
+            self._b = np.zeros(dim)
+        elif self._A.shape[0] != dim:
+            raise ValueError("Feature dimension mismatch for LinTS")
 
