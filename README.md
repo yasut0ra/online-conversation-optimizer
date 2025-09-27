@@ -98,6 +98,13 @@ Each turn appends to `logs/turns-YYYYMMDD.jsonl` with previews, features, bandit
 
 Run `python scripts/quick_report.py` to see aggregate reward, style win rates, exploration, and propensity stats.
 
+## Web UI
+
+- Start the API (`uvicorn src.app:app --reload`) and open <http://localhost:8000/ui>.
+- 入力フォームにメッセージを送ると候補カードが表示され、クリックでフィードバックが送信されます。
+- 右上の簡易メトリクスは `/metrics` を定期ポーリングして更新されます。
+- **Screenshot placeholder:** _Add UI screenshot here_
+
 ## How to extend
 
 - **Switch bandits**: set `BANDIT_ALGO=lints` (Thompson sampling) or `linucb` (upper-confidence bound) to change exploration behaviour without code changes.
