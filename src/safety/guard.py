@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
-from typing import Iterable, List, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 from ..types import Candidate
 
