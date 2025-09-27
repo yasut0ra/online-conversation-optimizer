@@ -14,7 +14,7 @@ def _candidate_to_dict(candidate: Candidate) -> Dict[str, Any]:
     return {
         "text": candidate.text,
         "style": candidate.style,
-        "meta": candidate.meta,
+        "features": candidate.features,
     }
 
 
