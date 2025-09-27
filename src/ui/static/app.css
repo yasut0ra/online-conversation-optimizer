@@ -1,0 +1,26 @@
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.message.user {
+  border-color: rgba(99, 102, 241, 0.6);
+  background-color: rgba(99, 102, 241, 0.15);
+}
+
+.message.assistant {
+  border-color: rgba(79, 70, 229, 0.4);
+}
+
+#candidates .candidate-card {
+  transition: transform 0.15s ease;
+}
+
+#candidates .candidate-card:hover {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 1024px) {
+  aside {
+    display: none;
+  }
+}
