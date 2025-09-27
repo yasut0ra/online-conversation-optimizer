@@ -96,6 +96,7 @@ def _build_orchestrator() -> ConversationOrchestrator:
         bandit_manager=bandit_manager,
         feature_extractor=feature_extractor,
         logger=logger,
+        bandit_algo=config.bandit_algo,
     )
     return orchestrator
 
