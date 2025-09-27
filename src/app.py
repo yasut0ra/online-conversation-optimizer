@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from .bandit import BanditManager, LinTS, LinUCB
 from .config import AppConfig, load_config
@@ -27,13 +27,29 @@ class TurnRequest(BaseModel):
     N: int | None = Field(None, description="生成する候補数")
     session_id: str | None = Field(None, description="セッションID（任意）")
 
-    @validator("user_utterance")
-    def _validate_utterance(cls, value: str) -> str:
-        if not value or not value.strip():
+    @field_validator("user_utterance", mode="before")
+    @classmethod
+    def _coerce_utterance(cls, value: str | None) -> str:
+        if value is None:
             raise ValueError("ユーザ発話が空です")
-        return value.strip()
+        value = str(value).strip()
+        if not value:
+            raise ValueError("ユーザ発話が空です")
+        return value
 
-    @validator("history")
+    @field_validator("history", mode="before")
+    @classmethod
+    def _coerce_history(cls, value: str | list[str] | None) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [line for line in value.splitlines() if line.strip()]
+        if isinstance(value, list):
+            return [str(item) for item in value]
+        raise TypeError("historyは文字列またはリストで指定してください")
+
+    @field_validator("history")
+    @classmethod
     def _validate_history(cls, value: list[str]) -> list[str]:
         if len(value) > 50:
             raise ValueError("historyは50件までにしてください")
