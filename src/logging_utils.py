@@ -111,6 +111,8 @@ class JsonlInteractionLogger:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "context_hash": record.context_hash,
+            "session_id": record.session_id,
+            "turn_id": record.turn_id,
             "candidates": [_candidate_to_dict(c) for c in record.candidates],
             "chosen_idx": record.chosen_idx,
             "propensity": record.propensity,
