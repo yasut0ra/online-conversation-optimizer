@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Online Conversation Optimizer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" />
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body class="bg-slate-950 text-slate-100">
+    <div class="min-h-screen flex">
+      <main class="flex-1 max-w-4xl mx-auto w-full py-6 px-4 lg:px-8">
+        <header class="mb-6">
+          <h1 class="text-2xl font-semibold">Online Conversation Optimizer</h1>
+          <p class="text-sm text-slate-400 mt-1">
+            フォームに入力して候補を生成し、最終返信を選択してください。
+          </p>
+        </header>
+        <section id="conversation" class="space-y-3 mb-6 overflow-y-auto max-h-[45vh] pr-2">
+        </section>
+        <section class="mb-6">
+          <div id="candidates" class="grid gap-3"></div>
+        </section>
+        <form id="turn-form" class="flex flex-col gap-3" hx-post="/api/turn" hx-target="#candidates" hx-swap="innerHTML">
+          <input type="hidden" name="history_json" id="history-json" value="{{ history_json }}" />
+          <input type="hidden" name="session_id" id="session-id" value="{{ session_id }}" />
+          <input type="hidden" name="candidate_count" id="candidate-count" value="{{ candidate_count }}" />
+          <label class="block">
+            <span class="text-sm text-slate-300">ユーザ発話</span>
+            <textarea
+              id="user-utterance"
+              name="user_utterance"
+              rows="3"
+              class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="今日はどう動く？"
+              required
+            ></textarea>
+          </label>
+          <div class="flex items-center gap-3">
+            <button
+              type="submit"
+              class="rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            >
+              候補を生成
+            </button>
+            <div id="status-message" class="text-sm text-slate-400"></div>
+          </div>
+        </form>
+      </main>
+      <aside class="w-72 bg-slate-900/60 border-l border-slate-800 p-4 hidden lg:flex flex-col gap-4">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-300">メトリクス</h2>
+          <dl id="metrics-box" class="mt-2 space-y-2 text-sm text-slate-300">
+            <div>
+              <dt class="text-slate-400">ターン数</dt>
+              <dd id="metric-turn-count">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">平均報酬</dt>
+              <dd id="metric-avg-reward">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">探索率</dt>
+              <dd id="metric-exploration">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">プロペンシティ</dt>
+              <dd id="metric-propensity">-</dd>
+            </div>
+          </dl>
+        </div>
+        <div>
+          <h2 class="text-sm font-semibold text-slate-300">スタイル勝率</h2>
+          <ul id="metric-style-rates" class="mt-2 text-sm text-slate-300 space-y-1"></ul>
+        </div>
+      </aside>
+    </div>
+  </body>
+</html>
