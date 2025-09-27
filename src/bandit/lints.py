@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 
 from .base import Bandit
@@ -15,10 +13,10 @@ class LinTS(Bandit):
 
     def __init__(
         self,
-        sigma2: Optional[float] = None,
-        lam: Optional[float] = None,
-        beta: Optional[float] = None,
-        random_state: Optional[int] = None,
+        sigma2: float | None = None,
+        lam: float | None = None,
+        beta: float | None = None,
+        random_state: int | None = None,
     ) -> None:
         super().__init__(beta=beta)
         self._sigma2 = (
@@ -30,8 +28,8 @@ class LinTS(Bandit):
             lam if lam is not None else get_env_float("BANDIT_LAMBDA", 1.0)
         )
         self._rng = np.random.default_rng(random_state)
-        self._A: Optional[np.ndarray] = None
-        self._b: Optional[np.ndarray] = None
+        self._A: np.ndarray | None = None
+        self._b: np.ndarray | None = None
 
     def _select_impl(
         self, prior_scores: np.ndarray, features: np.ndarray

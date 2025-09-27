@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 
 from ..types import BanditDecision
@@ -28,7 +26,7 @@ class BanditManager:
         )
         return decision
 
-    def update(self, phi: np.ndarray, reward: float, chosen_idx: Optional[int] = None) -> None:
+    def update(self, phi: np.ndarray, reward: float, chosen_idx: int | None = None) -> None:
         if chosen_idx is None:
             chosen_idx = self._policy.last_index
         self._policy.update(phi, reward, chosen_idx)

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable
 
 
 class PromptLoader:
@@ -11,7 +11,7 @@ class PromptLoader:
 
     def __init__(self, root: Path) -> None:
         self._root = root
-        self._cache: Dict[str, str] = {}
+        self._cache: dict[str, str] = {}
 
     def list_prompt_ids(self) -> Iterable[str]:
         """Yield prompt identifiers sorted lexicographically."""
@@ -33,7 +33,7 @@ class PromptLoader:
         self._cache[prompt_id] = content
         return content
 
-    def load_all(self) -> Dict[str, str]:
+    def load_all(self) -> dict[str, str]:
         """Return all prompts keyed by their identifier."""
 
         for prompt_id in self.list_prompt_ids():

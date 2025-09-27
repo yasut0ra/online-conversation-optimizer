@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Sequence, Tuple
 
 from ..types import Candidate, GenerationContext, Message
 
@@ -23,16 +23,16 @@ def _clip(value: float, min_value: float, max_value: float) -> float:
 class FeatureExtractor:
     """Compute feature vectors used by the contextual bandit."""
 
-    styles_catalog: Dict[str, Dict[str, object]]
+    styles_catalog: dict[str, dict[str, object]]
 
     def build_features(
         self, context: GenerationContext, candidates: Iterable[Candidate]
-    ) -> Tuple[List[List[float]], List[Dict[str, float]]]:
+    ) -> tuple[list[list[float]], list[dict[str, float]]]:
         """Return numeric features and a friendly mapping for logging."""
 
         base_features = self._context_features(context)
-        vectors: List[List[float]] = []
-        dense_mappings: List[Dict[str, float]] = []
+        vectors: list[list[float]] = []
+        dense_mappings: list[dict[str, float]] = []
 
         for candidate in candidates:
             style_meta = self.styles_catalog.get(candidate.style, {})
@@ -53,7 +53,7 @@ class FeatureExtractor:
 
         return vectors, dense_mappings
 
-    def _context_features(self, context: GenerationContext) -> List[float]:
+    def _context_features(self, context: GenerationContext) -> list[float]:
         messages = context.messages
         last_user = _last_user_message(messages)
         last_len = len(last_user)
@@ -66,8 +66,8 @@ class FeatureExtractor:
         ]
 
     def _candidate_features(
-        self, candidate: Candidate, style_meta: Dict[str, object]
-    ) -> List[float]:
+        self, candidate: Candidate, style_meta: dict[str, object]
+    ) -> list[float]:
         words = len(candidate.text.split())
         question = 1.0 if "?" in candidate.text else 0.0
         initiative = float(style_meta.get("initiative", 0.5))

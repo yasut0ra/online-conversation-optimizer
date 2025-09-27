@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import List, Sequence, Tuple
+from collections.abc import Sequence
 
 from ..types import Candidate
 
@@ -46,7 +46,7 @@ def _rewrite(text: str) -> str:
 def review_candidates(
     candidates: Sequence[Candidate],
     min_score: float | None = None,
-) -> Tuple[List[int], List[float], List[str]]:
+) -> tuple[list[int], list[float], list[str]]:
     """Return approved indices, safety scores, and rewrites."""
 
     if min_score is None:
@@ -55,9 +55,9 @@ def review_candidates(
         except ValueError:
             min_score = 0.2
 
-    approved: List[int] = []
-    scores: List[float] = []
-    rewrites: List[str] = []
+    approved: list[int] = []
+    scores: list[float] = []
+    rewrites: list[str] = []
     for idx, candidate in enumerate(candidates):
         text = candidate.text
         score = _score_candidate(text)
