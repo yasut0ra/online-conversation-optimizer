@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -20,18 +20,18 @@ class Candidate:
 
     text: str
     style: str
-    features: Dict[str, Any] = field(default_factory=dict)
+    features: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class GenerationContext:
     """Input context for generating reply candidates."""
 
-    messages: List[Message]
-    user_profile: Optional[Dict[str, Any]] = None
-    goal: Optional[str] = None
-    constraints: Optional[Dict[str, Any]] = None
-    styles_allowed: Optional[List[str]] = None
+    messages: list[Message]
+    user_profile: dict[str, Any] | None = None
+    goal: str | None = None
+    constraints: dict[str, Any] | None = None
+    styles_allowed: list[str] | None = None
     candidate_count: int = 3
 
 
@@ -40,8 +40,8 @@ class BanditDecision:
     """Decision returned by the bandit policy."""
 
     chosen_index: int
-    propensities: List[float]
-    scores: List[float]
+    propensities: list[float]
+    scores: list[float]
 
 
 @dataclass
@@ -51,8 +51,8 @@ class InteractionLogRecord:
     context_hash: str
     session_id: str
     turn_id: str
-    candidates: List[Candidate]
+    candidates: list[Candidate]
     chosen_idx: int
     propensity: float
-    reward: Optional[float]
-    features: Dict[str, Any]
+    reward: float | None
+    features: dict[str, Any]
