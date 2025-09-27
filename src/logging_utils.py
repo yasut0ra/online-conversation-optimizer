@@ -6,17 +6,18 @@ import json
 import os
 import platform
 import threading
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any
 
 from .types import Candidate, InteractionLogRecord
 
 _APPEND_LOCK = threading.Lock()
 
 
-def _candidate_to_dict(candidate: Candidate) -> Dict[str, Any]:
+def _candidate_to_dict(candidate: Candidate) -> dict[str, Any]:
     return {
         "text": candidate.text,
         "style": candidate.style,
@@ -24,10 +25,10 @@ def _candidate_to_dict(candidate: Candidate) -> Dict[str, Any]:
     }
 
 
-def _candidate_preview(candidate: Any) -> Dict[str, Any]:
+def _candidate_preview(candidate: Any) -> dict[str, Any]:
     text = ""
     style = "unknown"
-    features: Dict[str, Any] = {}
+    features: dict[str, Any] = {}
     if isinstance(candidate, Candidate):
         text = candidate.text
         style = candidate.style
@@ -45,8 +46,8 @@ def _candidate_preview(candidate: Any) -> Dict[str, Any]:
     }
 
 
-def _build_env_versions() -> Dict[str, str]:
-    versions: Dict[str, str] = {"python": platform.python_version()}
+def _build_env_versions() -> dict[str, str]:
+    versions: dict[str, str] = {"python": platform.python_version()}
     try:
         import fastapi
 
@@ -65,7 +66,7 @@ def _build_env_versions() -> Dict[str, str]:
 ENV_VERSIONS = _build_env_versions()
 
 
-def log_turn(session_id: str, turn_id: str, payload: Dict[str, Any]) -> None:
+def log_turn(session_id: str, turn_id: str, payload: dict[str, Any]) -> None:
     """Append a single turn entry to a date-partitioned JSONL file."""
 
     date_str = datetime.utcnow().strftime("%Y%m%d")
