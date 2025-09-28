@@ -102,7 +102,9 @@ Run `python scripts/quick_report.py` to see aggregate reward, style win rates, e
 ## Web UI
 
 - Start the API (`uvicorn src.app:app --reload`) and open <http://localhost:8000/ui>.
-- 入力フォームにメッセージを送ると候補カードが表示され、クリックでフィードバックが送信されます。
+- 外部CDNに依存しないため、オフライン環境でも動作します。
+- 候補数や報酬スライダーを調整して候補生成→カードをクリックするとフィードバック（latency 付き）が送信されます。
+- ヘッダーの「会話をクリア」「新しいセッション」で履歴を即リセットできます。
 - 右上の簡易メトリクスは `/metrics` を定期ポーリングして更新されます。
 - **Screenshot placeholder:** _Add UI screenshot here_
 
