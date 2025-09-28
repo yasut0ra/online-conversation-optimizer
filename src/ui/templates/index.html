@@ -1,81 +1,700 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang='ja'>
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
     <title>Online Conversation Optimizer</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" />
-    <link rel="stylesheet" href="/static/app.css" />
-    <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
-    <script src="/static/app.js" defer></script>
+    <style>:root {
+  color-scheme: dark;
+  --bg-main: #0f172a;
+  --bg-panel: #17213a;
+  --bg-card: #1f2a40;
+  --border-color: #273247;
+  --accent: #4c6ef5;
+  --accent-soft: #3b5bdb;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.page {
+  margin: 0;
+  font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  background: linear-gradient(135deg, #10172f, #0b1222);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+.layout {
+  min-height: 100vh;
+  display: flex;
+  gap: 0;
+}
+
+.main-panel {
+  flex: 1;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header-text {
+  flex: 1 1 320px;
+}
+
+.header p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.control-group input[type="number"] {
+  width: 80px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.85);
+  color: var(--text-primary);
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-row input[type="range"] {
+  width: 180px;
+}
+
+#reward-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.conversation {
+  flex: 1;
+  margin-top: 24px;
+  margin-bottom: 24px;
+  padding-right: 8px;
+  overflow-y: auto;
+  max-height: 45vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message {
+  background: rgba(31, 41, 64, 0.9);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.message.user {
+  border-color: var(--accent);
+  background: rgba(76, 110, 245, 0.15);
+}
+
+.message-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.message-text {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.5;
+}
+
+.candidates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.candidate-card {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-card);
+  padding: 16px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border 0.15s ease, box-shadow 0.15s ease;
+}
+
+.candidate-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.35);
+}
+
+.candidate-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(76, 110, 245, 0.4);
+}
+
+.candidate-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.candidate-style {
+  color: #8ea2ff;
+  font-weight: 600;
+}
+
+.candidate-text {
+  margin: 12px 0;
+  line-height: 1.5;
+}
+
+.candidate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.turn-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input-group span {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.input-group textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.8);
+  padding: 12px;
+  color: var(--text-primary);
+  resize: vertical;
+  font-size: 1rem;
+}
+
+.input-group textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(76, 110, 245, 0.3);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+button.primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+button.primary:hover {
+  background: var(--accent-soft);
+}
+
+.ghost {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: border 0.15s ease, color 0.15s ease;
+}
+
+.ghost:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.status {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.metrics-panel {
+  width: 280px;
+  background: rgba(23, 33, 58, 0.85);
+  border-left: 1px solid var(--border-color);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.metrics-panel h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.03em;
+}
+
+#metrics-box {
+  margin-top: 10px;
+  display: grid;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+
+#metrics-box dt {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+#metrics-box dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+#metric-style-rates {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+#metric-style-rates li {
+  color: var(--text-primary);
+}
+
+@media (max-width: 960px) {
+  .layout {
+    flex-direction: column;
+  }
+  .metrics-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+  }
+  .conversation {
+    max-height: none;
+  }
+}
+</style>
   </head>
-  <body class="bg-slate-950 text-slate-100">
-    <div class="min-h-screen flex">
-      <main class="flex-1 max-w-4xl mx-auto w-full py-6 px-4 lg:px-8">
-        <header class="mb-6">
-          <h1 class="text-2xl font-semibold">Online Conversation Optimizer</h1>
-          <p class="text-sm text-slate-400 mt-1">
-            フォームに入力して候補を生成し、最終返信を選択してください。
-          </p>
+  <body class='page'>
+    <div class='layout'>
+      <main class='main-panel'>
+        <header class='header'>
+          <div class='header-text'>
+            <h1>Online Conversation Optimizer</h1>
+            <p>フォームに入力して候補を生成し、最終返信を選択してください。</p>
+          </div>
+          <div class='header-actions'>
+            <button id='clear-btn' type='button' class='ghost'>会話をクリア</button>
+            <button id='reset-btn' type='button' class='ghost'>新しいセッション</button>
+          </div>
         </header>
-        <section id="conversation" class="space-y-3 mb-6 overflow-y-auto max-h-[45vh] pr-2">
-        </section>
-        <section class="mb-6">
-          <div id="candidates" class="grid gap-3"></div>
-        </section>
-        <form id="turn-form" class="flex flex-col gap-3" hx-post="/api/turn" hx-target="#candidates" hx-swap="innerHTML">
-          <input type="hidden" name="history_json" id="history-json" value="{{ history_json }}" />
-          <input type="hidden" name="session_id" id="session-id" value="{{ session_id }}" />
-          <input type="hidden" name="candidate_count" id="candidate-count" value="{{ candidate_count }}" />
-          <label class="block">
-            <span class="text-sm text-slate-300">ユーザ発話</span>
-            <textarea
-              id="user-utterance"
-              name="user_utterance"
-              rows="3"
-              class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="今日はどう動く？"
-              required
-            ></textarea>
+        <section class='controls'>
+          <div class='control-group'>
+            <label for='candidate-count'>候補数</label>
+            <input id='candidate-count' type='number' min='1' max='6' value='{ candidate_count }' />
+          </div>
+          <div class='control-group'>
+            <label for='reward-input'>報酬 ( -1.0 ～ 1.0 )</label>
+            <div class='slider-row'>
+              <input id='reward-input' type='range' min='-1' max='1' step='0.1' value='1' />
+              <span id='reward-value'>1.0</span>
+            </div>
+          </div>
+          <label class='toggle'>
+            <input id='continued-toggle' type='checkbox' checked />
+            <span>続きの会話として扱う</span>
           </label>
-          <div class="flex items-center gap-3">
-            <button
-              type="submit"
-              class="rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            >
-              候補を生成
-            </button>
-            <div id="status-message" class="text-sm text-slate-400"></div>
+        </section>
+        <section id='conversation' class='conversation'></section>
+        <section id='candidates' class='candidates'></section>
+        <form id='turn-form' class='turn-form'>
+          <input type='hidden' name='history_json' id='history-json' value='{ history_json }' />
+          <input type='hidden' name='session_id' id='session-id' value='{ session_id }' />
+          <input type='hidden' name='candidate_count' id='candidate-count-hidden' value='{ candidate_count }' />
+          <label class='input-group'>
+            <span>ユーザ発話</span>
+            <textarea id='user-utterance' name='user_utterance' rows='3' placeholder='今日はどう動く？' required></textarea>
+          </label>
+          <div class='actions'>
+            <button type='submit' class='primary'>候補を生成</button>
+            <div id='status-message' class='status'></div>
           </div>
         </form>
       </main>
-      <aside class="w-72 bg-slate-900/60 border-l border-slate-800 p-4 hidden lg:flex flex-col gap-4">
+      <aside class='metrics-panel'>
         <div>
-          <h2 class="text-sm font-semibold text-slate-300">メトリクス</h2>
-          <dl id="metrics-box" class="mt-2 space-y-2 text-sm text-slate-300">
-            <div>
-              <dt class="text-slate-400">ターン数</dt>
-              <dd id="metric-turn-count">-</dd>
-            </div>
-            <div>
-              <dt class="text-slate-400">平均報酬</dt>
-              <dd id="metric-avg-reward">-</dd>
-            </div>
-            <div>
-              <dt class="text-slate-400">探索率</dt>
-              <dd id="metric-exploration">-</dd>
-            </div>
-            <div>
-              <dt class="text-slate-400">プロペンシティ</dt>
-              <dd id="metric-propensity">-</dd>
-            </div>
+          <h2>メトリクス</h2>
+          <dl id='metrics-box'>
+            <div><dt>ターン数</dt><dd id='metric-turn-count'>-</dd></div>
+            <div><dt>平均報酬</dt><dd id='metric-avg-reward'>-</dd></div>
+            <div><dt>探索率</dt><dd id='metric-exploration'>-</dd></div>
+            <div><dt>プロペンシティ</dt><dd id='metric-propensity'>-</dd></div>
           </dl>
         </div>
-        <div>
-          <h2 class="text-sm font-semibold text-slate-300">スタイル勝率</h2>
-          <ul id="metric-style-rates" class="mt-2 text-sm text-slate-300 space-y-1"></ul>
+        <div class='style-rates'>
+          <h2>スタイル勝率</h2>
+          <ul id='metric-style-rates'></ul>
         </div>
       </aside>
     </div>
+    <script>(function () {
+  const state = {
+    history: [],
+    sessionId: null,
+    pendingUser: null,
+    lastTurnResponseAt: null,
+  };
+
+  const conversation = document.getElementById('conversation');
+  const candidatesBox = document.getElementById('candidates');
+  const historyInput = document.getElementById('history-json');
+  const sessionInput = document.getElementById('session-id');
+  const messageInput = document.getElementById('user-utterance');
+  const candidateCountInput = document.getElementById('candidate-count');
+  const candidateCountHidden = document.getElementById('candidate-count-hidden');
+  const rewardInput = document.getElementById('reward-input');
+  const rewardValue = document.getElementById('reward-value');
+  const continuedToggle = document.getElementById('continued-toggle');
+  const clearButton = document.getElementById('clear-btn');
+  const resetButton = document.getElementById('reset-btn');
+  const form = document.getElementById('turn-form');
+  const statusMessage = document.getElementById('status-message');
+
+  function generateSessionId() {
+    const fallback = 'sess-' + Date.now();
+    return (self.crypto && self.crypto.randomUUID) ? self.crypto.randomUUID() : fallback;
+  }
+
+  function ensureSessionId() {
+    if (sessionInput.value) {
+      state.sessionId = sessionInput.value;
+    } else {
+      state.sessionId = generateSessionId();
+      sessionInput.value = state.sessionId;
+    }
+  }
+
+  function updateHistoryInput() {
+    historyInput.value = JSON.stringify(state.history);
+  }
+
+  function appendMessage(role, text) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message ' + role;
+    const label = document.createElement('div');
+    label.className = 'message-label';
+    label.textContent = role === 'user' ? 'ユーザ' : 'アシスタント';
+    const body = document.createElement('p');
+    body.className = 'message-text';
+    body.textContent = text;
+    wrapper.appendChild(label);
+    wrapper.appendChild(body);
+    conversation.appendChild(wrapper);
+    conversation.scrollTop = conversation.scrollHeight;
+    return wrapper;
+  }
+
+  function removeLastMessageIfUser() {
+    const last = conversation.lastElementChild;
+    if (last && last.className && last.className.indexOf('message user') !== -1) {
+      conversation.removeChild(last);
+    }
+  }
+
+  function attachCandidateHandlers() {
+    candidatesBox.querySelectorAll('.candidate-card').forEach((card) => {
+      card.addEventListener('click', handleCandidateClick);
+    });
+  }
+
+  function removeCandidateHandlers() {
+    candidatesBox.querySelectorAll('.candidate-card').forEach((card) => {
+      card.removeEventListener('click', handleCandidateClick);
+    });
+  }
+
+  function highlightCandidate(card) {
+    candidatesBox.querySelectorAll('.candidate-card').forEach((node) => {
+      node.classList.remove('selected');
+    });
+    if (card) {
+      card.classList.add('selected');
+    }
+  }
+
+  function renderCandidates(html) {
+    candidatesBox.innerHTML = html;
+    const list = candidatesBox.querySelector('#candidate-list');
+    if (!list) {
+      return;
+    }
+    const sessionId = list.dataset.sessionId;
+    const turnId = list.dataset.turnId;
+    list.querySelectorAll('.candidate-card').forEach((card) => {
+      const candidate = JSON.parse(card.dataset.candidate);
+      candidate.session_id = sessionId;
+      candidate.turn_id = turnId;
+      card.dataset.candidate = JSON.stringify(candidate);
+    });
+    attachCandidateHandlers();
+  }
+
+  async function handleCandidateClick(event) {
+    const card = event.currentTarget;
+    if (!card || card.dataset.disabled === 'true') {
+      return;
+    }
+    const candidate = JSON.parse(card.dataset.candidate);
+    highlightCandidate(card);
+    const latencyMs = state.lastTurnResponseAt ? Math.round(performance.now() - state.lastTurnResponseAt) : null;
+    const reward = parseFloat(rewardInput ? rewardInput.value : '1');
+    const payload = {
+      session_id: candidate.session_id,
+      turn_id: candidate.turn_id,
+      chosen_idx: candidate.index,
+      reward: Number.isNaN(reward) ? 1.0 : reward,
+      latency_ms: latencyMs,
+      continued: continuedToggle ? continuedToggle.checked : true,
+    };
+    card.dataset.disabled = 'true';
+    try {
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error('feedback failed');
+      }
+      appendMessage('assistant', candidate.text);
+      if (state.pendingUser !== null) {
+        state.history.push(state.pendingUser);
+      }
+      state.history.push(candidate.text);
+      state.pendingUser = null;
+      messageInput.value = '';
+      candidatesBox.innerHTML = '';
+      updateHistoryInput();
+      statusMessage.textContent = '';
+      refreshMetrics();
+    } catch (error) {
+      statusMessage.textContent = 'フィードバックに失敗しました';
+    } finally {
+      delete card.dataset.disabled;
+    }
+  }
+
+  async function submitTurn(event) {
+    event.preventDefault();
+    const message = messageInput.value.trim();
+    if (!message) {
+      statusMessage.textContent = '入力してください';
+      return;
+    }
+
+    state.pendingUser = message;
+    appendMessage('user', message);
+    updateHistoryInput();
+    statusMessage.textContent = '候補を生成中...';
+    removeCandidateHandlers();
+    if (candidateCountHidden && candidateCountInput) {
+      candidateCountHidden.value = candidateCountInput.value;
+    }
+    sessionInput.value = state.sessionId;
+    const formData = new FormData(form);
+
+    try {
+      const response = await fetch('/api/turn', {
+        method: 'POST',
+        body: formData,
+      });
+      const html = await response.text();
+      if (!response.ok) {
+        statusMessage.textContent = html.replace(/<[^>]+>/g, '');
+        removeLastMessageIfUser();
+        state.pendingUser = null;
+        return;
+      }
+      state.lastTurnResponseAt = performance.now();
+      renderCandidates(html);
+    } catch (error) {
+      statusMessage.textContent = '候補生成に失敗しました';
+      removeLastMessageIfUser();
+      state.pendingUser = null;
+    }
+  }
+
+  async function refreshMetrics() {
+    try {
+      const response = await fetch('/metrics');
+      if (!response.ok) {
+        return;
+      }
+      const data = await response.json();
+      renderMetrics(data);
+    } catch (error) {
+      /* ignore */
+    }
+  }
+
+  function renderMetrics(data) {
+    document.getElementById('metric-turn-count').textContent = data.turn_count ?? '-';
+    const avg = data.avg_reward;
+    document.getElementById('metric-avg-reward').textContent =
+      avg !== null && avg !== undefined ? avg.toFixed(3) : 'n/a';
+    const exploration = data.exploration_rate != null ? data.exploration_rate : 0;
+    document.getElementById('metric-exploration').textContent = Math.round(exploration * 100) + '%';
+    const meanValue = data.propensity_mean;
+    const stdValue = data.propensity_std;
+    if (meanValue !== null && meanValue !== undefined) {
+      const stdPart = (stdValue !== null && stdValue !== undefined) ? ' / σ=' + stdValue.toFixed(3) : '';
+      document.getElementById('metric-propensity').textContent = meanValue.toFixed(3) + stdPart;
+    } else {
+      document.getElementById('metric-propensity').textContent = 'n/a';
+    }
+    const list = document.getElementById('metric-style-rates');
+    list.innerHTML = '';
+    if (data.style_win_rates) {
+      Object.entries(data.style_win_rates)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([style, rate]) => {
+          const item = document.createElement('li');
+          item.textContent = style + ': ' + (rate * 100).toFixed(1) + '%';
+          list.appendChild(item);
+        });
+    }
+  }
+
+  function clearConversation() {
+    state.history = [];
+    state.pendingUser = null;
+    conversation.innerHTML = '';
+    candidatesBox.innerHTML = '';
+    updateHistoryInput();
+    statusMessage.textContent = '';
+    messageInput.value = '';
+  }
+
+  function resetSession() {
+    clearConversation();
+    state.sessionId = generateSessionId();
+    sessionInput.value = state.sessionId;
+  }
+
+  function clampCandidateCount() {
+    if (!candidateCountInput) {
+      return;
+    }
+    let value = parseInt(candidateCountInput.value, 10);
+    if (Number.isNaN(value) || value < 1) {
+      value = 1;
+    }
+    if (value > 6) {
+      value = 6;
+    }
+    candidateCountInput.value = value;
+    if (candidateCountHidden) {
+      candidateCountHidden.value = value;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    ensureSessionId();
+    updateHistoryInput();
+    clampCandidateCount();
+    refreshMetrics();
+    setInterval(refreshMetrics, 5000);
+    form.addEventListener('submit', submitTurn);
+    if (clearButton) {
+      clearButton.addEventListener('click', clearConversation);
+    }
+    if (resetButton) {
+      resetButton.addEventListener('click', resetSession);
+    }
+    if (candidateCountInput) {
+      candidateCountInput.addEventListener('change', clampCandidateCount);
+    }
+    if (rewardInput && rewardValue) {
+      rewardValue.textContent = parseFloat(rewardInput.value).toFixed(1);
+      rewardInput.addEventListener('input', () => {
+        rewardValue.textContent = parseFloat(rewardInput.value).toFixed(1);
+      });
+    }
+  });
+})();
+</script>
   </body>
 </html>
