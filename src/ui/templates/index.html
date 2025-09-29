@@ -750,6 +750,12 @@ button.primary:hover {
     if (!card || card.dataset.disabled === 'true') {
       return;
     }
+    
+    // 特徴量のdetails要素がクリックされた場合は選択処理をスキップ
+    if (event.target.closest('.candidate-features')) {
+      return;
+    }
+    
     const candidate = JSON.parse(card.dataset.candidate);
     highlightCandidate(card);
     const latencyMs = state.lastTurnResponseAt ? Math.round(performance.now() - state.lastTurnResponseAt) : null;
