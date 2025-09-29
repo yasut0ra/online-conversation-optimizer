@@ -126,6 +126,102 @@ body.page {
   height: 18px;
 }
 
+.advanced-settings {
+  margin-top: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(23, 33, 58, 0.65);
+  overflow: hidden;
+}
+
+.advanced-settings summary {
+  cursor: pointer;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  list-style: none;
+}
+
+.advanced-settings[open] summary {
+  color: var(--text-primary);
+}
+
+.advanced-settings summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-grid {
+  padding: 0 16px 16px;
+  display: grid;
+  gap: 16px;
+}
+
+.advanced-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.advanced-grid input[type="text"],
+.advanced-grid textarea {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  resize: vertical;
+}
+
+.advanced-grid textarea {
+  min-height: 96px;
+}
+
+.style-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.style-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: rgba(31, 41, 64, 0.6);
+  transition: border 0.15s ease, background 0.15s ease;
+}
+
+.style-option input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.style-option input:checked + span {
+  color: var(--text-primary);
+}
+
+.style-option:hover {
+  border-color: var(--accent);
+}
+
+.advanced-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.advanced-hint {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
 .conversation {
   flex: 1;
   margin-top: 24px;
@@ -214,6 +310,45 @@ body.page {
   color: var(--text-muted);
 }
 
+.candidate-features {
+  margin-top: 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.candidate-features summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.candidate-features ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+
+.candidate-features li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.candidate-features .feature-key {
+  color: var(--text-secondary);
+}
+
+.candidate-features .feature-value {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
 .turn-form {
   display: flex;
   flex-direction: column;
@@ -279,6 +414,11 @@ button.primary:hover {
 .ghost:hover {
   border-color: var(--accent);
   color: var(--text-primary);
+}
+
+.ghost.small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
 }
 
 .status {
@@ -384,6 +524,49 @@ button.primary:hover {
           <input type='hidden' name='history_json' id='history-json' value='{ history_json }' />
           <input type='hidden' name='session_id' id='session-id' value='{ session_id }' />
           <input type='hidden' name='candidate_count' id='candidate-count-hidden' value='{ candidate_count }' />
+          <details class='advanced-settings' id='advanced-settings'>
+            <summary>高度な設定</summary>
+            <div class='advanced-grid'>
+              <label>
+                <span>会話ゴール</span>
+                <input id='goal-input' name='goal' type='text' placeholder='例: 次のアクションを決める' />
+              </label>
+              <label>
+                <span>スタイル選択</span>
+                <div class='style-grid'>
+                  {% for style in styles_catalog %}
+                  <label class='style-option'>
+                    <input type='checkbox' name='styles' value='{{ style }}' {% if default_styles and style in default_styles %}checked{% elif not default_styles %}checked{% endif %} />
+                    <span>{{ style }}</span>
+                  </label>
+                  {% endfor %}
+                </div>
+                <div class='advanced-actions'>
+                  <button type='button' id='select-all-styles' class='ghost small'>全選択</button>
+                  <button type='button' id='clear-styles' class='ghost small'>全解除</button>
+                </div>
+              </label>
+              <label>
+                <span>ユーザープロファイル (JSON)</span>
+                <textarea id='user-profile' name='user_profile' rows='4' placeholder='{"segment": "busy professional"}'></textarea>
+              </label>
+              <label>
+                <span>制約条件 (JSON)</span>
+                <textarea id='constraints' name='constraints' rows='3' placeholder='{"tone": "positive"}'></textarea>
+              </label>
+              <label>
+                <span>履歴を編集 (一行 = 一発話・先頭はユーザ)</span>
+                <textarea id='history-editor' rows='4' placeholder='例:
+今日は疲れた
+そうなんですね、少し休息を取りましょう'></textarea>
+                <div class='advanced-actions'>
+                  <button type='button' id='apply-history' class='ghost small'>履歴に適用</button>
+                  <button type='button' id='clear-history-editor' class='ghost small'>入力をクリア</button>
+                  <span class='advanced-hint'>適用すると現状の会話が置き換わります</span>
+                </div>
+              </label>
+            </div>
+          </details>
           <label class='input-group'>
             <span>ユーザ発話</span>
             <textarea id='user-utterance' name='user_utterance' rows='3' placeholder='今日はどう動く？' required></textarea>
@@ -432,6 +615,11 @@ button.primary:hover {
   const resetButton = document.getElementById('reset-btn');
   const form = document.getElementById('turn-form');
   const statusMessage = document.getElementById('status-message');
+  const historyEditor = document.getElementById('history-editor');
+  const applyHistoryButton = document.getElementById('apply-history');
+  const clearHistoryEditorButton = document.getElementById('clear-history-editor');
+  const selectAllStylesButton = document.getElementById('select-all-styles');
+  const clearStylesButton = document.getElementById('clear-styles');
 
   function generateSessionId() {
     const fallback = 'sess-' + Date.now();
@@ -448,7 +636,44 @@ button.primary:hover {
   }
 
   function updateHistoryInput() {
-    historyInput.value = JSON.stringify(state.history);
+    if (historyInput) {
+      historyInput.value = JSON.stringify(state.history);
+    }
+    if (historyEditor) {
+      historyEditor.value = state.history.join('\n');
+    }
+  }
+
+  function renderConversationFromState() {
+    if (!conversation) {
+      return;
+    }
+    conversation.innerHTML = '';
+    let role = 'user';
+    state.history.forEach((text) => {
+      appendMessage(role, text);
+      role = role === 'user' ? 'assistant' : 'user';
+    });
+  }
+
+  function setStylesChecked(checked) {
+    document.querySelectorAll("input[name='styles']").forEach((input) => {
+      input.checked = checked;
+    });
+  }
+
+  function hydrateHistoryFromInput() {
+    if (!historyInput || !historyInput.value) {
+      return;
+    }
+    try {
+      const parsed = JSON.parse(historyInput.value);
+      if (Array.isArray(parsed)) {
+        state.history = parsed.map((item) => String(item));
+      }
+    } catch (error) {
+      state.history = [];
+    }
   }
 
   function appendMessage(role, text) {
@@ -673,11 +898,15 @@ button.primary:hover {
 
   document.addEventListener('DOMContentLoaded', () => {
     ensureSessionId();
+    hydrateHistoryFromInput();
+    renderConversationFromState();
     updateHistoryInput();
     clampCandidateCount();
     refreshMetrics();
     setInterval(refreshMetrics, 5000);
-    form.addEventListener('submit', submitTurn);
+    if (form) {
+      form.addEventListener('submit', submitTurn);
+    }
     if (clearButton) {
       clearButton.addEventListener('click', clearConversation);
     }
@@ -691,6 +920,28 @@ button.primary:hover {
       rewardValue.textContent = parseFloat(rewardInput.value).toFixed(1);
       rewardInput.addEventListener('input', () => {
         rewardValue.textContent = parseFloat(rewardInput.value).toFixed(1);
+      });
+    }
+    if (selectAllStylesButton) {
+      selectAllStylesButton.addEventListener('click', () => setStylesChecked(true));
+    }
+    if (clearStylesButton) {
+      clearStylesButton.addEventListener('click', () => setStylesChecked(false));
+    }
+    if (applyHistoryButton && historyEditor) {
+      applyHistoryButton.addEventListener('click', () => {
+        const lines = historyEditor.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        state.history = lines;
+        state.pendingUser = null;
+        renderConversationFromState();
+        candidatesBox.innerHTML = '';
+        updateHistoryInput();
+        statusMessage.textContent = `履歴を${lines.length}件に更新しました`;
+      });
+    }
+    if (clearHistoryEditorButton && historyEditor) {
+      clearHistoryEditorButton.addEventListener('click', () => {
+        historyEditor.value = '';
       });
     }
   });
