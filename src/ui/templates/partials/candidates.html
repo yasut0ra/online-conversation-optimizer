@@ -23,6 +23,16 @@
       <span>Safety: {{ '{:.2f}'.format(candidate.safety_score) }}</span>
       {% endif %}
     </div>
+    {% if candidate.features %}
+    <details class="candidate-features">
+      <summary>特徴量を表示</summary>
+      <ul>
+        {% for key, value in candidate.features.items() %}
+        <li><span class="feature-key">{{ key }}</span><span class="feature-value">{{ value }}</span></li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
