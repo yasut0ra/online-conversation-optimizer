@@ -217,6 +217,11 @@ body.page {
   flex-wrap: wrap;
 }
 
+.advanced-footer {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
 .advanced-hint {
   color: var(--text-muted);
   font-size: 0.75rem;
@@ -565,6 +570,9 @@ button.primary:hover {
                   <span class='advanced-hint'>適用すると現状の会話が置き換わります</span>
                 </div>
               </label>
+            </div>
+            <div class='advanced-actions advanced-footer'>
+              <button type='button' id='close-advanced' class='ghost small'>閉じる</button>
             </div>
           </details>
           <label class='input-group'>
@@ -942,6 +950,13 @@ button.primary:hover {
     if (clearHistoryEditorButton && historyEditor) {
       clearHistoryEditorButton.addEventListener('click', () => {
         historyEditor.value = '';
+      });
+    }
+    const closeAdvancedButton = document.getElementById('close-advanced');
+    const advancedSettings = document.getElementById('advanced-settings');
+    if (closeAdvancedButton && advancedSettings) {
+      closeAdvancedButton.addEventListener('click', () => {
+        advancedSettings.open = false;
       });
     }
   });
