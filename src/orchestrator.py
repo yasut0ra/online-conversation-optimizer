@@ -76,6 +76,11 @@ class ConversationOrchestrator:
         self._bandit_algo = bandit_algo
         self._pending: dict[tuple[str, str], PendingInteraction] = {}
 
+    @property
+    def styles_catalog(self) -> dict[str, dict[str, object]]:
+        """Expose the generator's styles catalog for UI consumption."""
+        return self._generator.styles_catalog
+
     def run_turn(
         self,
         context: GenerationContext,

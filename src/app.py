@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import uuid
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from .bandit import BanditManager, LinTS, LinUCB
 from .config import AppConfig, load_config
@@ -30,22 +32,46 @@ templates = Jinja2Templates(directory=str(UI_DIR / "templates"))
 
 
 class TurnRequest(BaseModel):
-    history: list[str] = Field(default_factory=list, description="これまでの会話履歴")
-    user_utterance: str = Field(..., description="現在のユーザ発話")
-    N: int | None = Field(None, description="生成する候補数")
-    session_id: str | None = Field(None, description="セッションID（任意）")
+    history: list[str] = Field(default_factory=list, description='\u3053\u308c\u307e\u3067\u306e\u4f1a\u8a71\u5c65\u6b74')
+    user_utterance: str = Field(..., description='\u73fe\u5728\u306e\u30e6\u30fc\u30b6\u767a\u8a71')
+    N: int | None = Field(None, description='\u751f\u6210\u3059\u308b\u5019\u88dc\u6570')
+    session_id: str | None = Field(None, description='\u30bb\u30c3\u30b7\u30e7\u30f3ID\uff08\u4efb\u610f\uff09')
+    goal: str | None = Field(None, description='\u5bfe\u8a71\u306e\u76ee\u7684\u30fb\u30b4\u30fc\u30eb')
+    user_profile: dict[str, Any] | None = Field(None, description='\u30e6\u30fc\u30b6\u30fc\u30d7\u30ed\u30d5\u30a1\u30a4\u30eb(JSON)')
+    constraints: dict[str, Any] | None = Field(None, description='\u5236\u7d04\u6761\u4ef6(JSON)')
+    styles: list[str] | None = Field(None, description='\u30b9\u30bf\u30a4\u30eb\u306e\u30db\u30ef\u30a4\u30c8\u30ea\u30b9\u30c8')
 
-    @field_validator("user_utterance", mode="before")
+    @staticmethod
+    def _parse_dict_field(value: Any, field_name: str) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            trimmed = value.strip()
+            if not trimmed:
+                return None
+            try:
+                parsed = json.loads(trimmed)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{field_name}\u306f\u6709\u52b9\u306aJSON\u3092\u6307\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044") from exc
+        elif isinstance(value, dict):
+            parsed = value
+        else:
+            raise TypeError(f"{field_name}\u306f\u8f9e\u66f8\u5f62\u5f0f\u3067\u6307\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044")
+        if not isinstance(parsed, dict):
+            raise ValueError(f"{field_name}\u306f\u30aa\u30d6\u30b8\u30a7\u30af\u30c8\u5f62\u5f0f\u306eJSON\u3067\u6307\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044")
+        return parsed
+
+    @field_validator('user_utterance', mode='before')
     @classmethod
     def _coerce_utterance(cls, value: str | None) -> str:
         if value is None:
-            raise ValueError("ユーザ発話が空です")
+            raise ValueError('\u30e6\u30fc\u30b6\u767a\u8a71\u304c\u7a7a\u3067\u3059')
         value = str(value).strip()
         if not value:
-            raise ValueError("ユーザ発話が空です")
+            raise ValueError('\u30e6\u30fc\u30b6\u767a\u8a71\u304c\u7a7a\u3067\u3059')
         return value
 
-    @field_validator("history", mode="before")
+    @field_validator('history', mode='before')
     @classmethod
     def _coerce_history(cls, value: str | list[str] | None) -> list[str]:
         if value is None:
@@ -54,14 +80,60 @@ class TurnRequest(BaseModel):
             return [line for line in value.splitlines() if line.strip()]
         if isinstance(value, list):
             return [str(item) for item in value]
-        raise TypeError("historyは文字列またはリストで指定してください")
+        raise TypeError('history\u306f\u6587\u5b57\u5217\u307e\u305f\u306f\u30ea\u30b9\u30c8\u3067\u6307\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044')
 
-    @field_validator("history")
+    @field_validator('history')
     @classmethod
     def _validate_history(cls, value: list[str]) -> list[str]:
         if len(value) > 50:
-            raise ValueError("historyは50件までにしてください")
+            raise ValueError('history\u306f50\u4ef6\u307e\u3067\u306b\u3057\u3066\u304f\u3060\u3055\u3044')
         return value
+
+    @field_validator('goal', mode='before')
+    @classmethod
+    def _coerce_goal(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if len(text) > 500:
+            raise ValueError('goal\u306f500\u6587\u5b57\u4ee5\u5185\u3067\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044')
+        return text
+
+    @field_validator('user_profile', mode='before')
+    @classmethod
+    def _coerce_user_profile(cls, value: Any) -> dict[str, Any] | None:
+        return cls._parse_dict_field(value, 'user_profile')
+
+    @field_validator('constraints', mode='before')
+    @classmethod
+    def _coerce_constraints(cls, value: Any) -> dict[str, Any] | None:
+        return cls._parse_dict_field(value, 'constraints')
+
+    @field_validator('styles', mode='before')
+    @classmethod
+    def _coerce_styles(cls, value: Any) -> list[str] | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            items = [part.strip() for part in value.split(',') if part.strip()]
+        elif isinstance(value, (list, tuple, set)):
+            items = [str(part).strip() for part in value if str(part).strip()]
+        else:
+            raise TypeError('styles\u306f\u6587\u5b57\u5217\u307e\u305f\u306f\u30ea\u30b9\u30c8\u3067\u6307\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044')
+        if not items:
+            return None
+        deduped = list(dict.fromkeys(items))
+        return deduped
+
+    @field_validator('styles')
+    @classmethod
+    def _validate_styles(cls, value: list[str] | None) -> list[str] | None:
+        if value and len(value) > 20:
+            raise ValueError('styles\u306f20\u4ef6\u4ee5\u5185\u3067\u6307\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044')
+        return value
+
 
 
 class DebugInfo(BaseModel):
@@ -137,7 +209,10 @@ async def turn(request: TurnRequest) -> TurnResponse:
     context = GenerationContext(
         messages=messages,
         candidate_count=candidate_count,
-        styles_allowed=CONFIG.styles_whitelist,
+        styles_allowed=request.styles or CONFIG.styles_whitelist,
+        goal=request.goal,
+        user_profile=request.user_profile,
+        constraints=request.constraints,
     )
     session_id = request.session_id.strip() if request.session_id else None
     if session_id and len(session_id) > 128:
@@ -193,6 +268,8 @@ async def ui(request: Request) -> HTMLResponse:
         "session_id": session_id,
         "history_json": "[]",
         "candidate_count": CONFIG.candidate_count,
+        "styles_catalog": sorted(_orchestrator.styles_catalog.keys()),
+        "default_styles": CONFIG.styles_whitelist or [],
     }
     return templates.TemplateResponse(request, "index.html", context)
 
@@ -207,7 +284,7 @@ async def api_turn(request: Request) -> HTMLResponse:
     form = await request.form()
     user_utterance = (form.get("user_utterance") or "").strip()
     if not user_utterance:
-        return HTMLResponse("<div class='text-red-400 text-sm'>ユーザ発話を入力してください。</div>", status_code=400)
+        return HTMLResponse("<div class='text-red-400 text-sm'>\u30e6\u30fc\u30b6\u767a\u8a71\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002</div>", status_code=400)
 
     history_raw = form.get("history_json") or "[]"
     try:
@@ -224,27 +301,45 @@ async def api_turn(request: Request) -> HTMLResponse:
         try:
             n_override = int(candidate_count_value)
         except ValueError:
-            return HTMLResponse("<div class='text-red-400 text-sm'>候補数は数値で指定してください。</div>", status_code=400)
+            return HTMLResponse("<div class='text-red-400 text-sm'>\u5019\u88dc\u6570\u306f\u6570\u5024\u3067\u6307\u5b9a\u3057\u3066\u304f\u3060\u3055\u3044\u3002</div>", status_code=400)
+
+    goal_value = (form.get("goal") or "").strip()
+    user_profile_raw = form.get("user_profile")
+    constraints_raw = form.get("constraints")
+    styles_selected = form.getlist("styles") if hasattr(form, "getlist") else form.get("styles")
 
     payload = {
         "history": history_data,
         "user_utterance": user_utterance,
         "N": n_override,
         "session_id": session_id,
+        "goal": goal_value or None,
+        "user_profile": user_profile_raw,
+        "constraints": constraints_raw,
+        "styles": styles_selected,
     }
-    turn_request = TurnRequest.model_validate(payload)
+    try:
+        turn_request = TurnRequest.model_validate(payload)
+    except ValidationError as exc:
+        errors = exc.errors()
+        message = errors[0].get("msg", "入力値に誤りがあります。") if errors else "入力値に誤りがあります。"
+        escaped = html.escape(message)
+        return HTMLResponse(f"<div class='text-red-400 text-sm'>{escaped}</div>", status_code=400)
 
     candidate_count = turn_request.N or CONFIG.candidate_count
     if candidate_count <= 0:
-        return HTMLResponse("<div class='text-red-400 text-sm'>Nは正の整数にしてください。</div>", status_code=400)
+        return HTMLResponse("<div class='text-red-400 text-sm'>N\u306f\u6b63\u306e\u6574\u6570\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002</div>", status_code=400)
     if turn_request.session_id and len(turn_request.session_id) > 128:
-        return HTMLResponse("<div class='text-red-400 text-sm'>session_idが長すぎます。</div>", status_code=400)
+        return HTMLResponse("<div class='text-red-400 text-sm'>session_id\u304c\u9577\u3059\u304e\u307e\u3059\u3002</div>", status_code=400)
 
     messages = _messages_from_history(turn_request.history, turn_request.user_utterance)
     context = GenerationContext(
         messages=messages,
         candidate_count=candidate_count,
-        styles_allowed=CONFIG.styles_whitelist,
+        styles_allowed=turn_request.styles or CONFIG.styles_whitelist,
+        goal=turn_request.goal,
+        user_profile=turn_request.user_profile,
+        constraints=turn_request.constraints,
     )
     session = turn_request.session_id.strip() if turn_request.session_id else str(uuid.uuid4())
     turn_id = str(uuid.uuid4())
@@ -264,6 +359,7 @@ async def api_turn(request: Request) -> HTMLResponse:
                 "score": float(scores[idx]),
                 "propensity": float(propensities[idx]),
                 "safety_score": candidate.features.get("safety_score"),
+                "features": candidate.features,
                 "session_id": result.session_id,
                 "turn_id": result.turn_id,
             }
