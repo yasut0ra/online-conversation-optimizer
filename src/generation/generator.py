@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from collections.abc import Iterable, Sequence
@@ -14,6 +15,14 @@ from ..types import Candidate, GenerationContext, Message
 DEFAULT_MODEL_NAME = "gpt-4o-mini"
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 PROMPT_ORDER = ["00_system_core", "10_generator", "11_styles_catalog"]
+
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a conversation response generator. Always reply with a JSON array of "
+    "candidate objects. Each object must include 'text' and 'style' fields, and a "
+    "'features' object with metadata when available."
+)
+
+logger = logging.getLogger(__name__)
 
 
 def _load_styles_catalog(loader: PromptLoader) -> dict:
@@ -34,6 +43,46 @@ def _compose_system_prompt(loader: PromptLoader) -> str:
             continue
     return "\n\n".join(parts)
 
+
+
+
+def _parse_candidates_payload(raw: str) -> list[dict]:
+    raw = raw.strip()
+    if not raw:
+        raise ValueError("empty payload")
+
+    decoder = json.JSONDecoder()
+    snippets: list[str] = []
+    for candidate in (raw, raw.lstrip()):
+        if candidate and candidate not in snippets:
+            snippets.append(candidate)
+    for token in ("[", "{"):
+        idx = raw.find(token)
+        if idx != -1:
+            snippet = raw[idx:]
+            if snippet and snippet not in snippets:
+                snippets.append(snippet)
+
+    for snippet in snippets:
+        try:
+            parsed, _ = decoder.raw_decode(snippet)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict):
+            for key in ("candidates", "outputs", "choices", "data"):
+                value = parsed.get(key)
+                if isinstance(value, list):
+                    return value
+                if isinstance(value, str):
+                    try:
+                        decoded = json.loads(value)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(decoded, list):
+                        return decoded
+    raise ValueError("could not parse candidates from payload")
 
 def _detect_language(text: str) -> str:
     if re.search("[\u3040-\u30ff\u4e00-\u9fff]", text):
@@ -70,7 +119,8 @@ class CandidateGenerator:
         self._model = model
         self._temperature = temperature
         self._max_output_tokens = max_output_tokens
-        self._system_prompt = _compose_system_prompt(self._loader)
+        composed_prompt = _compose_system_prompt(self._loader).strip()
+        self._system_prompt = composed_prompt or DEFAULT_SYSTEM_PROMPT
         self._styles_catalog = _load_styles_catalog(self._loader)
 
     @property
@@ -82,8 +132,8 @@ class CandidateGenerator:
         if api_key:
             try:
                 return self._generate_via_openai(context, api_key)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.exception("LLM generation failed; falling back", exc_info=exc)
         return self._generate_fallback(context)
 
     def _generate_via_openai(
@@ -106,31 +156,43 @@ class CandidateGenerator:
             "N": context.candidate_count,
         }
 
-        response = client.responses.create(
+        messages = [
+            {"role": "system", "content": self._system_prompt},
+            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+        ]
+        completion = client.chat.completions.create(
             model=self._model,
             temperature=self._temperature,
-            max_output_tokens=self._max_output_tokens,
-            input=[
-                {"role": "system", "content": self._system_prompt},
-                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-            ],
+            max_tokens=self._max_output_tokens,
+            messages=messages,
         )
 
         text_fragments: list[str] = []
-        for output in response.output:
-            if output.type != "message":
+        for choice in completion.choices:
+            message = getattr(choice, "message", None)
+            if not message:
                 continue
-            for segment in output.message.content:
-                if getattr(segment, "type", None) == "text":
-                    text_fragments.append(segment.text)
+            content = getattr(message, "content", None)
+            if isinstance(content, str):
+                text_fragments.append(content)
+            elif isinstance(content, list):
+                for part in content:
+                    if isinstance(part, str):
+                        text_fragments.append(part)
+                    elif isinstance(part, dict):
+                        value = part.get("text") or part.get("content") or part.get("value")
+                        if isinstance(value, str):
+                            text_fragments.append(value)
 
-        raw = "\n".join(text_fragments)
+        raw = "\n".join(text_fragments).strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
         try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError as exc:
+            parsed = _parse_candidates_payload(raw)
+        except ValueError as exc:
+            logger.error("LLM response not valid JSON: %s", raw)
             raise RuntimeError("LLM response was not valid JSON") from exc
-        if not isinstance(parsed, list):
-            raise RuntimeError("LLM response did not return a list of candidates")
         candidates: list[Candidate] = []
         language = self._infer_language(context.messages)
         for item in parsed:
