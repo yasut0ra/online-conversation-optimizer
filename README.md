@@ -10,12 +10,14 @@ MVP that generates N reply candidates, annotates features, exposes action propen
 
 | name | default | description |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | _required for live generation_ | API key for OpenAI Responses API. Omit to use deterministic fallback. |
+| `OPENAI_API_KEY` | _required for live generation_ | API key for the OpenAI Chat Completions API. Omit to use deterministic fallback. |
 | `CANDIDATE_COUNT` | `3` | Default number of candidates per turn. Overridden by request `N`. |
 | `STYLES_WHITELIST` | catalog styles | Comma-separated subset of styles permitted for generation. |
 | `BANDIT_ALGO` | `linucb` | Choose `linucb` or `lints` for action selection. |
 | `LOG_PATH` | `logs/interactions.jsonl` | Secondary JSONL stream used by the legacy logger. |
 | `SAFETY_MIN_SCORE` | `0.2` | Minimum safety score before a candidate is rewritten/dropped. |
+
+The generator stitches system prompts from the markdown catalog and safeguards against empty instructions by falling back to an internal `DEFAULT_SYSTEM_PROMPT`. This keeps Chat Completions requests stable even when prompt files are missing.
 
 Run the API:
 
@@ -112,5 +114,6 @@ Run `python scripts/quick_report.py` to see aggregate reward, style win rates, e
 
 - **Switch bandits**: set `BANDIT_ALGO=lints` (Thompson sampling) or `linucb` (upper-confidence bound) to change exploration behaviour without code changes.
 - **Add new styles**: append entries to `prompts/11_styles_catalog.md` and include matching rules in `src/generation/generator.py` fallback prompts to ensure offline coverage.
+- **Tune the safety net**: adjust the `DEFAULT_SYSTEM_PROMPT` in `src/generation/generator.py` to guarantee minimal instructions when your custom prompt files are empty or filtered out.
 - **Integrate alternate models**: tweak `DEFAULT_MODEL_NAME` or override `CandidateGenerator` while keeping the JSON contract (`text`, `style`, `features`).
 - **Custom safety rules**: expand `src/safety/guard.py` with domain-specific heuristics or plug-in classifiers before the bandit sees candidates.
