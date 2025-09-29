@@ -1,37 +1,36 @@
 # Online Conversation Optimizer
 
+MVPとしての会話最適化システムです。各ターンで複数候補を生成し、特徴量を付与し、コンテキストバンディットで即時学習します。安全性チェックやログ蓄積がデフォルトで有効になっており、IPS / Doubly Robust といった評価にもすぐ対応できます。
 
-MVP that generates N reply candidates, annotates features, exposes action propensities, and learns online with a contextual bandit. Safe-by-default, evaluation-ready (IPS/DR logs).
+## クイックスタート
 
+### 環境変数
 
-## Quickstart
-
-### Environment variables
-
-| name | default | description |
+| 変数名 | 既定値 | 説明 |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | _required for live generation_ | API key for the OpenAI Chat Completions API. Omit to use deterministic fallback. |
-| `CANDIDATE_COUNT` | `3` | Default number of candidates per turn. Overridden by request `N`. |
-| `STYLES_WHITELIST` | catalog styles | Comma-separated subset of styles permitted for generation. |
-| `BANDIT_ALGO` | `linucb` | Choose `linucb` or `lints` for action selection. |
-| `LOG_PATH` | `logs/interactions.jsonl` | Secondary JSONL stream used by the legacy logger. |
-| `SAFETY_MIN_SCORE` | `0.2` | Minimum safety score before a candidate is rewritten/dropped. |
+| `OPENAI_API_KEY` | 必須 (リアル生成時) | OpenAI Chat Completions API のキー。未設定の場合は決定論的なフォールバックのみ利用。|
+| `CANDIDATE_COUNT` | `3` | 各ターンで生成する候補数。リクエストの `N` が優先。|
+| `STYLES_WHITELIST` | スタイルカタログ全体 | 生成を許可するスタイルIDのカンマ区切りリスト。|
+| `BANDIT_ALGO` | `linucb` | バンディットのアルゴリズム。`linucb` または `lints`。|
+| `LOG_PATH` | `logs/interactions.jsonl` | 旧来のJSONLロガーが書き込むファイルパス。|
+| `SAFETY_MIN_SCORE` | `0.2` | 安全スコアが閾値を下回った場合はリライト／除外。|
 
-The generator stitches system prompts from the markdown catalog and safeguards against empty instructions by falling back to an internal `DEFAULT_SYSTEM_PROMPT`. This keeps Chat Completions requests stable even when prompt files are missing.
+プロンプトは Markdown カタログから順番に連結され、空振りした場合でも内部の `DEFAULT_SYSTEM_PROMPT` にフォールバックするため、Chat Completions へのリクエストが常に安定します。
 
-Run the API:
+API サーバーを起動:
 
 ```bash
-export OPENAI_API_KEY=your_key_here  # optional
+export OPENAI_API_KEY=your_key_here  # 任意
 pip install fastapi uvicorn numpy httpx pytest ruff jinja2 python-multipart
 uvicorn src.app:app --reload
 ```
 
-### REST API
+## REST API
 
 ### `POST /turn`
 
-Request body
+リクエスト例:
+
 ```json
 {
   "history": ["以前のやり取り"],
@@ -41,7 +40,8 @@ Request body
 }
 ```
 
-Response body
+レスポンス例:
+
 ```json
 {
   "session_id": "optional-session",
@@ -58,7 +58,6 @@ Response body
 
 ### `POST /feedback`
 
-Request body
 ```json
 {
   "session_id": "optional-session",
@@ -68,9 +67,7 @@ Request body
 }
 ```
 
-### curl examples
-
-Request a turn:
+## curl での利用例
 
 ```bash
 TURN=$(curl -s -X POST http://localhost:8000/turn \
@@ -83,7 +80,7 @@ TURN=$(curl -s -X POST http://localhost:8000/turn \
 echo "$TURN" | jq
 ```
 
-Send feedback using values returned from the turn call:
+続けてフィードバックを送信:
 
 ```bash
 SESSION=$(echo "$TURN" | jq -r '.session_id')
@@ -95,25 +92,25 @@ curl -X POST http://localhost:8000/feedback \
   -d "{\"session_id\": \"$SESSION\", \"turn_id\": \"$TURN_ID\", \"chosen_idx\": $IDX, \"reward\": 0.6}"
 ```
 
-## Logs
+## ログ
 
-Each turn appends to `logs/turns-YYYYMMDD.jsonl` with previews, features, bandit metadata and rewards.
+各ターンは `logs/turns-YYYYMMDD.jsonl` に追記され、候補プレビュー／特徴量／バンディットのメタデータ／報酬がまとまります。
 
-Run `python scripts/quick_report.py` to see aggregate reward, style win rates, exploration, and propensity stats.
+`python scripts/quick_report.py` を実行すると、累積報酬やスタイル別勝率、探索率、propensity の統計を即座に確認できます。
 
 ## Web UI
 
-- Start the API (`uvicorn src.app:app --reload`) and open <http://localhost:8000/ui>.
-- 外部CDNに依存しないため、オフライン環境でも動作します。
-- 候補数や報酬スライダーを調整して候補生成→カードをクリックするとフィードバック（latency 付き）が送信されます。
-- ヘッダーの「会話をクリア」「新しいセッション」で履歴を即リセットできます。
-- 右上の簡易メトリクスは `/metrics` を定期ポーリングして更新されます。
-- **Screenshot placeholder:** _Add UI screenshot here_
+- `uvicorn src.app:app --reload` を起動し、<http://localhost:8000/ui> を開く。
+- 外部 CDN に依存しないのでオフライン環境でも UI が動作。
+- 候補数や報酬スライダーを調整しながら候補を生成し、カードをクリックすると latency 付きでフィードバック送信。
+- ヘッダーの「会話をクリア」「新しいセッション」で即リセット。
+- 右上の簡易メトリクスは `/metrics` を定期ポーリングして更新。
+- **スクリーンショット差し込み予定**: _後で画像を追加してください_
 
-## How to extend
+## 拡張方法
 
-- **Switch bandits**: set `BANDIT_ALGO=lints` (Thompson sampling) or `linucb` (upper-confidence bound) to change exploration behaviour without code changes.
-- **Add new styles**: append entries to `prompts/11_styles_catalog.md` and include matching rules in `src/generation/generator.py` fallback prompts to ensure offline coverage.
-- **Tune the safety net**: adjust the `DEFAULT_SYSTEM_PROMPT` in `src/generation/generator.py` to guarantee minimal instructions when your custom prompt files are empty or filtered out.
-- **Integrate alternate models**: tweak `DEFAULT_MODEL_NAME` or override `CandidateGenerator` while keeping the JSON contract (`text`, `style`, `features`).
-- **Custom safety rules**: expand `src/safety/guard.py` with domain-specific heuristics or plug-in classifiers before the bandit sees candidates.
+- **バンディットを切り替える**: 環境変数 `BANDIT_ALGO` を `lints` (Thompson Sampling) か `linucb` (UCB) に変更。
+- **スタイルを追加する**: `prompts/11_styles_catalog.md` にスタイルを追加し、オフライン fallback を保つなら `src/generation/generator.py` のテンプレートへ文面を追記。
+- **セーフティネットを調整する**: `src/generation/generator.py` 内の `DEFAULT_SYSTEM_PROMPT` を編集して、自前プロンプトが空になっても指示が欠落しないようにする。
+- **モデルを差し替える**: `DEFAULT_MODEL_NAME` を変更するか `CandidateGenerator` を継承／差し替えて JSON 契約 (`text`, `style`, `features`) を維持。
+- **安全ルールを強化する**: `src/safety/guard.py` にドメイン固有のルールや分類器を追加し、バンディットに渡す前にフィルタリング。
